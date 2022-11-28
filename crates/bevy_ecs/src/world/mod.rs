@@ -15,8 +15,8 @@ use crate::{
         Component, ComponentDescriptor, ComponentId, ComponentInfo, Components, TickCells,
     },
     entity::{AllocAtWithoutReplacement, Entities, Entity},
-    query::{QueryState, ReadOnlyWorldQuery, WorldQuery},
-    storage::{ResourceData, ResourceEntry, SparseSet, Storages},
+    query::{DebugCheckedUnwrap, QueryState, ReadOnlyWorldQuery, WorldQuery},
+    storage::{ResourceData, SparseSet, Storages},
     system::Resource,
 };
 use bevy_ptr::{OwningPtr, Ptr};
@@ -24,6 +24,7 @@ use bevy_utils::tracing::warn;
 use std::{
     any::TypeId,
     fmt,
+    marker::PhantomData,
     sync::atomic::{AtomicU32, Ordering},
 };
 mod identifier;
@@ -1326,7 +1327,7 @@ impl World {
     /// # Safety
     /// `component_id` must be valid for this world
     #[inline]
-    pub(crate) unsafe fn initialize_resource_internal(
+    unsafe fn initialize_resource_internal(
         &mut self,
         component_id: ComponentId,
     ) -> &mut ResourceData {
@@ -1562,6 +1563,79 @@ pub trait FromWorld {
 impl<T: Default> FromWorld for T {
     fn from_world(_world: &mut World) -> Self {
         T::default()
+    }
+}
+
+pub struct ResourceEntry<'a, T: 'static> {
+    world: &'a mut World,
+    component_id: ComponentId,
+    _marker: PhantomData<&'a mut T>,
+}
+
+impl<'a, T: 'static> ResourceEntry<'a, T> {
+    /// # Safety
+    /// * `component_id` must have been initialized with `world`.
+    /// * The type associated with `component_id` must be `T`.
+    #[inline]
+    pub(crate) unsafe fn new(world: &'a mut World, component_id: ComponentId) -> Self {
+        Self {
+            world,
+            component_id,
+            _marker: PhantomData,
+        }
+    }
+
+    /// If the resource exists, allows modifying it before any potential inserts.
+    pub fn and_modify(self, f: impl FnOnce(Mut<T>)) -> Self {
+        let last_change_tick = self.world.last_change_tick();
+        let change_tick = self.world.change_tick();
+
+        // SAFETY: `self.component_id` was initialized with `self.world`.
+        let data = unsafe { self.world.initialize_resource_internal(self.component_id) };
+        if let Some((ptr, ticks)) = data.get_with_ticks() {
+            // SAFETY: We have exclusive access to the resource storage.
+            let ptr = unsafe { ptr.assert_unique() };
+            let resource = Mut {
+                // SAFETY: `T` is the underlying type of `self.data`.
+                value: unsafe { ptr.deref_mut() },
+                // SAFETY: We have exclusive access to the resource storage.
+                ticks: unsafe { Ticks::from_tick_cells(ticks, last_change_tick, change_tick) },
+            };
+            f(resource);
+        }
+        self
+    }
+
+    #[inline]
+    pub fn or_insert(self, val: T) -> Mut<'a, T> {
+        self.or_insert_with(|| val)
+    }
+
+    #[inline]
+    pub fn or_insert_with(self, f: impl FnOnce() -> T) -> Mut<'a, T> {
+        let last_change_tick = self.world.last_change_tick();
+        let change_tick = self.world.change_tick();
+
+        // SAFETY: `self.component_id` was initialized with `self.world`.
+        let data = unsafe { self.world.initialize_resource_internal(self.component_id) };
+        // If the resource does not have a value, insert one.
+        if !data.is_present() {
+            OwningPtr::make(f(), |val| {
+                // SAFETY: The owned pointer `val` has an erased type `T`,
+                // which matches the underlying type of the storage `self.data`.
+                unsafe { data.insert(val, change_tick) };
+            });
+        }
+        // SAFETY: The resource data must have value.
+        let (ptr, ticks) = unsafe { data.get_with_ticks().debug_checked_unwrap() };
+        // SAFETY: We have exclusive access to the resource storage.
+        let ptr = unsafe { ptr.assert_unique() };
+        Mut {
+            // SAFETY: `T` is the underlying type of `self.data`.
+            value: unsafe { ptr.deref_mut() },
+            // SAFETY: We have exclusive access to the resource storage.
+            ticks: unsafe { Ticks::from_tick_cells(ticks, last_change_tick, change_tick) },
+        }
     }
 }
 
