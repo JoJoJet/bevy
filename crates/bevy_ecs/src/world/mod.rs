@@ -1590,9 +1590,13 @@ impl<'a, T: 'static> ResourceEntry<'a, T> {
         let last_change_tick = self.world.last_change_tick();
         let change_tick = self.world.change_tick();
 
-        // SAFETY: `self.component_id` was initialized with `self.world`.
-        let data = unsafe { self.world.initialize_resource_internal(self.component_id) };
-        if let Some((ptr, ticks)) = data.get_with_ticks() {
+        if let Some((ptr, ticks)) = self
+            .world
+            .storages
+            .resources
+            .get_mut(self.component_id)
+            .and_then(|data| data.get_with_ticks())
+        {
             // SAFETY: We have exclusive access to the resource storage.
             let ptr = unsafe { ptr.assert_unique() };
             let resource = Mut {
