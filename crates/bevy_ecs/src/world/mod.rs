@@ -1626,7 +1626,7 @@ impl<'a, T: 'static> ResourceEntry<'a, T> {
         if !data.is_present() {
             OwningPtr::make(f(), |val| {
                 // SAFETY: The owned pointer `val` has an erased type `T`,
-                // which matches the underlying type of the storage `self.data`.
+                // which matches the underlying type of the resource storage.
                 unsafe { data.insert(val, change_tick) };
             });
         }
@@ -1635,7 +1635,7 @@ impl<'a, T: 'static> ResourceEntry<'a, T> {
         // SAFETY: We have exclusive access to the resource storage.
         let ptr = unsafe { ptr.assert_unique() };
         Mut {
-            // SAFETY: `T` is the underlying type of `self.data`.
+            // SAFETY: `T` is the underlying type of the resource storage.
             value: unsafe { ptr.deref_mut() },
             // SAFETY: We have exclusive access to the resource storage.
             ticks: unsafe { Ticks::from_tick_cells(ticks, last_change_tick, change_tick) },
