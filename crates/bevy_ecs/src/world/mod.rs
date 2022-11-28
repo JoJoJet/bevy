@@ -838,14 +838,9 @@ impl World {
     }
 
     pub fn resource_entry<T: Resource>(&mut self) -> ResourceEntry<T> {
-        let last_change_tick = self.last_change_tick();
-        let change_tick = self.change_tick();
-
         let id = self.components.init_resource::<T>();
-        // SAFETY: `id` was just initialized with this world, so it must be valid.
-        let data = unsafe { self.initialize_resource_internal(id) };
-        // SAFETY: The underlying type of `data` is `T`.
-        unsafe { ResourceEntry::new(data, last_change_tick, change_tick) }
+        // SAFETY: `id` was initialized with `self`. The underlying type of `data` is `T`.
+        unsafe { ResourceEntry::new(self, id) }
     }
 
     /// Gets a reference to the resource of the given type
@@ -1331,7 +1326,7 @@ impl World {
     /// # Safety
     /// `component_id` must be valid for this world
     #[inline]
-    unsafe fn initialize_resource_internal(
+    pub(crate) unsafe fn initialize_resource_internal(
         &mut self,
         component_id: ComponentId,
     ) -> &mut ResourceData {
