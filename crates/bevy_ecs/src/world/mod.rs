@@ -722,10 +722,7 @@ impl World {
     /// and those default values will be here instead.
     #[inline]
     pub fn init_resource<R: Resource + FromWorld>(&mut self) {
-        if !self.contains_resource::<R>() {
-            let resource = R::from_world(self);
-            self.insert_resource(resource);
-        }
+        self.resource_entry::<R>().or_init();
     }
 
     /// Inserts a new resource with the given `value`.
