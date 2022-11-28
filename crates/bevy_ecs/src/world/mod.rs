@@ -1689,18 +1689,18 @@ impl<'a, T: 'static> ResourceEntry<'a, T> {
         let change_tick = self.world.change_tick();
 
         // Get or initialize the resource's backing storage.
-        // NOTE: The borrow checker is overly restrictive here, so we are forced to check for a value
-        // and then unwrap instead of handling `Option<>` more idiomatically.
-        let data = if self
+        let data = if let Some(data) = self
             .world
             .storages
             .resources
-            .get(self.component_id)
-            .map_or(false, |data| data.is_present())
+            .get_mut(self.component_id)
+            .filter(|data| data.is_present())
+            // we must erase the lifetime so the borrow checker doesn't
+            // think that `self.world` is borrowed in the `else` block.
+            .map(|x| x as *mut _)
         {
-            let data = self.world.storages.resources.get_mut(self.component_id);
-            // SAFETY: We just checked that the resource has a backing storage.
-            unsafe { data.debug_checked_unwrap() }
+            // SAFETY: the pointer `data` was just cast from a mutable reference.
+            unsafe { &mut *data }
         } else {
             let val = T::from_world(self.world);
 
