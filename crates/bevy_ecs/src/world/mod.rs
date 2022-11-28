@@ -1626,7 +1626,55 @@ impl<'a, T: 'static> ResourceEntry<'a, T> {
                 unsafe { data.insert(val, change_tick) };
             });
         }
-        // SAFETY: The resource data must have value.
+        // SAFETY: The resource data must have a value.
+        let (ptr, ticks) = unsafe { data.get_with_ticks().debug_checked_unwrap() };
+        // SAFETY: We have exclusive access to the resource storage.
+        let ptr = unsafe { ptr.assert_unique() };
+        Mut {
+            // SAFETY: `T` is the underlying type of `self.data`.
+            value: unsafe { ptr.deref_mut() },
+            // SAFETY: We have exclusive access to the resource storage.
+            ticks: unsafe { Ticks::from_tick_cells(ticks, last_change_tick, change_tick) },
+        }
+    }
+
+    #[inline]
+    pub fn or_init(self) -> Mut<'a, T>
+    where
+        T: FromWorld,
+    {
+        let last_change_tick = self.world.last_change_tick();
+        let change_tick = self.world.change_tick();
+
+        // Get or initialize the resource's backing storage.
+        // NOTE: The borrow checker is overly restrictive here, so we are forced to check for a value
+        // and then unwrap instead of handling `Option<>` more idiomatically.
+        let data = if self
+            .world
+            .storages
+            .resources
+            .get(self.component_id)
+            .map_or(false, |data| data.is_present())
+        {
+            let data = self.world.storages.resources.get_mut(self.component_id);
+            // SAFETY: We just checked that the resource has a backing storage.
+            unsafe { data.debug_checked_unwrap() }
+        } else {
+            let val = T::from_world(self.world);
+
+            // SAFETY: `self.component_id` was initialized with `self.world`.
+            let data = unsafe { self.world.initialize_resource_internal(self.component_id) };
+
+            OwningPtr::make(val, |val| {
+                // SAFETY: The owned pointer `val` has an erased type `T`,
+                // which matches the underlying type of the resource storage.
+                unsafe { data.insert(val, change_tick) };
+            });
+
+            data
+        };
+
+        // SAFETY: The resource data must have a value.
         let (ptr, ticks) = unsafe { data.get_with_ticks().debug_checked_unwrap() };
         // SAFETY: We have exclusive access to the resource storage.
         let ptr = unsafe { ptr.assert_unique() };
