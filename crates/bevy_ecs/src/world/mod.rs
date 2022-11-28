@@ -1566,6 +1566,8 @@ impl<T: Default> FromWorld for T {
     }
 }
 
+/// Provides a view into the storage for a single [`Resource`].
+/// This struct is created by [`World::resource_entry`].
 pub struct ResourceEntry<'a, T: 'static> {
     world: &'a mut World,
     component_id: ComponentId,
