@@ -211,6 +211,24 @@ impl<'a, T: 'static> ResourceEntry<'a, T> {
         }
     }
 
+    /// If the resource exists, allows modifying it before any potential inserts.
+    pub fn and_modify(self, f: impl FnOnce(Mut<T>)) -> Self {
+        if let Some((ptr, ticks)) = self.data.get_with_ticks() {
+            // SAFETY: We have exclusive access to the resource storage.
+            let ptr = unsafe { ptr.assert_unique() };
+            let resource = Mut {
+                // SAFETY: `T` is the underlying type of `self.data`.
+                value: unsafe { ptr.deref_mut() },
+                // SAFETY: We have exclusive access to the resource storage.
+                ticks: unsafe {
+                    Ticks::from_tick_cells(ticks, self.last_change_tick, self.change_tick)
+                },
+            };
+            f(resource);
+        }
+        self
+    }
+
     #[inline]
     pub fn or_insert(self, val: T) -> Mut<'a, T> {
         self.or_insert_with(|| val)
