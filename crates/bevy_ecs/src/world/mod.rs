@@ -1610,6 +1610,25 @@ impl<'a, T: 'static> ResourceEntry<'a, T> {
         self
     }
 
+    /// Set the value of the resource if it is empty, then returns a mutable reference to it.
+    ///
+    /// # Examples
+    /// ```
+    /// # use bevy_ecs::prelude::*;
+    /// #
+    /// #[derive(Resource, PartialEq, Eq)]
+    /// struct Counter(u64);
+    ///
+    /// let mut world = World::new();
+    ///
+    /// // The resource has no value, so one will be inserted.
+    /// let val = world.resource_entry().or_insert(Counter(0));
+    /// assert_eq!(val, Counter(0));
+    ///
+    /// // The resource already has a value, so it will keep its old one.
+    /// let val = world.resource_entry().or_insert(Counter(0));
+    /// assert_eq!(val, Counter(0));
+    /// ```
     #[inline]
     pub fn or_insert(self, val: T) -> Mut<'a, T> {
         self.or_insert_with(|| val)
@@ -1642,6 +1661,24 @@ impl<'a, T: 'static> ResourceEntry<'a, T> {
         }
     }
 
+    /// Initialize the resource (using [`FromWorld`]) if it is empty, then returns a mutable reference to it.
+    ///
+    /// ```rust
+    /// # use bevy_ecs::prelude::*;
+    /// #
+    /// #[derive(Resource, PartialEq, Eq)]
+    /// struct Counter(u64);
+    ///
+    /// impl FromWorld for Counter {
+    ///     fn from_world(_world: &mut Self) -> Self {
+    ///         Self(0)
+    ///     }
+    /// }
+    ///
+    /// // The resource does not have a value, so it will be initialized using `FromWorld`.
+    /// let val = world.resource_entry().or_init();
+    /// assert_eq!(val, Counter(0));
+    /// ```
     #[inline]
     pub fn or_init(self) -> Mut<'a, T>
     where
