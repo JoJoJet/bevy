@@ -1594,18 +1594,13 @@ impl<'a, T: 'static> ResourceEntry<'a, T> {
             .storages
             .resources
             .get_mut(self.component_id)
-            .and_then(|data| data.get_with_ticks())
+            .and_then(|data| data.get_mut_with_ticks(last_change_tick, change_tick))
         {
-            // SAFETY: We have exclusive access to the resource storage.
-            let ptr = unsafe { ptr.assert_unique() };
-            let resource = Mut {
-                // SAFETY: `T` is the underlying type of `self.data`.
-                value: unsafe { ptr.deref_mut() },
-                // SAFETY: We have exclusive access to the resource storage.
-                ticks: unsafe { Ticks::from_tick_cells(ticks, last_change_tick, change_tick) },
-            };
-            f(resource);
+            // SAFETY: `T` is the resource type corresponding to `self.component_id`.
+            let value = unsafe { ptr.deref_mut() };
+            f(Mut { value, ticks });
         }
+
         self
     }
 
@@ -1648,16 +1643,16 @@ impl<'a, T: 'static> ResourceEntry<'a, T> {
                 unsafe { data.insert(val, change_tick) };
             });
         }
-        // SAFETY: The resource data must have a value.
-        let (ptr, ticks) = unsafe { data.get_with_ticks().debug_checked_unwrap() };
-        // SAFETY: We have exclusive access to the resource storage.
-        let ptr = unsafe { ptr.assert_unique() };
-        Mut {
-            // SAFETY: `T` is the underlying type of the resource storage.
-            value: unsafe { ptr.deref_mut() },
-            // SAFETY: We have exclusive access to the resource storage.
-            ticks: unsafe { Ticks::from_tick_cells(ticks, last_change_tick, change_tick) },
-        }
+
+        // SAFETY: If the resource storage was originally empty, a value would have been inserted.
+        let (ptr, ticks) = unsafe {
+            data.get_mut_with_ticks(last_change_tick, change_tick)
+                .debug_checked_unwrap()
+        };
+
+        // SAFETY: `T` is the underlying type of the resource.
+        let value = unsafe { ptr.deref_mut() };
+        Mut { value, ticks }
     }
 
     /// Initializes the resource (using [`FromWorld`]) if it is empty, then returns a mutable reference to it.
@@ -1716,16 +1711,15 @@ impl<'a, T: 'static> ResourceEntry<'a, T> {
             data
         };
 
-        // SAFETY: The resource data must have a value.
-        let (ptr, ticks) = unsafe { data.get_with_ticks().debug_checked_unwrap() };
-        // SAFETY: We have exclusive access to the resource storage.
-        let ptr = unsafe { ptr.assert_unique() };
-        Mut {
-            // SAFETY: `T` is the underlying type of `self.data`.
-            value: unsafe { ptr.deref_mut() },
-            // SAFETY: We have exclusive access to the resource storage.
-            ticks: unsafe { Ticks::from_tick_cells(ticks, last_change_tick, change_tick) },
-        }
+        // SAFETY: If the resource storage was originally empty, a value would have been inserted.
+        let (ptr, ticks) = unsafe {
+            data.get_mut_with_ticks(last_change_tick, change_tick)
+                .debug_checked_unwrap()
+        };
+
+        // SAFETY: `T` is the underlying type of the resource.
+        let value = unsafe { ptr.deref_mut() };
+        Mut { value, ticks }
     }
 }
 
