@@ -16,7 +16,7 @@ use crate::{
     },
     entity::{AllocAtWithoutReplacement, Entities, Entity},
     query::{QueryState, ReadOnlyWorldQuery, WorldQuery},
-    storage::{ResourceData, SparseSet, Storages},
+    storage::{ResourceData, ResourceEntry, SparseSet, Storages},
     system::Resource,
 };
 use bevy_ptr::{OwningPtr, Ptr};
@@ -837,6 +837,17 @@ impl World {
             .unwrap_or(false)
     }
 
+    pub fn resource_entry<T: Resource>(&mut self) -> ResourceEntry<T> {
+        let last_change_tick = self.last_change_tick();
+        let change_tick = self.change_tick();
+
+        let id = self.components.init_resource::<T>();
+        // SAFETY: `id` was just initialized with this world, so it must be valid.
+        let data = unsafe { self.initialize_resource_internal(id) };
+        // SAFETY: The underlying type of `data` is `T`.
+        unsafe { ResourceEntry::new(data, last_change_tick, change_tick) }
+    }
+
     /// Gets a reference to the resource of the given type
     ///
     /// # Panics
@@ -900,7 +911,6 @@ impl World {
         unsafe { self.get_resource_unchecked_mut() }
     }
 
-    // PERF: optimize this to avoid redundant lookups
     /// Gets a mutable reference to the resource of type `T` if it exists,
     /// otherwise inserts the resource using the result of calling `func`.
     #[inline]
@@ -908,10 +918,7 @@ impl World {
         &mut self,
         func: impl FnOnce() -> R,
     ) -> Mut<'_, R> {
-        if !self.contains_resource::<R>() {
-            self.insert_resource(func());
-        }
-        self.resource_mut()
+        self.resource_entry().or_insert_with(func)
     }
 
     /// Gets a mutable reference to the resource of the given type, if it exists

@@ -1,5 +1,9 @@
+use std::marker::PhantomData;
+
 use crate::archetype::ArchetypeComponentId;
+use crate::change_detection::{Mut, Ticks};
 use crate::component::{ComponentId, ComponentTicks, Components, TickCells};
+use crate::query::DebugCheckedUnwrap;
 use crate::storage::{Column, SparseSet};
 use bevy_ptr::{OwningPtr, Ptr, UnsafeCellDeref};
 
@@ -179,6 +183,60 @@ impl Resources {
     pub(crate) fn check_change_ticks(&mut self, change_tick: u32) {
         for info in self.resources.values_mut() {
             info.column.check_change_ticks(change_tick);
+        }
+    }
+}
+
+pub struct ResourceEntry<'a, T: 'static> {
+    data: &'a mut ResourceData,
+    last_change_tick: u32,
+    change_tick: u32,
+    _marker: PhantomData<&'a mut T>,
+}
+
+impl<'a, T: 'static> ResourceEntry<'a, T> {
+    /// # Safety
+    /// The underlying type of `data` must match `T`.
+    #[inline]
+    pub(crate) unsafe fn new(
+        data: &'a mut ResourceData,
+        last_change_tick: u32,
+        change_tick: u32,
+    ) -> Self {
+        Self {
+            data,
+            last_change_tick,
+            change_tick,
+            _marker: PhantomData,
+        }
+    }
+
+    #[inline]
+    pub fn or_insert(self, val: T) -> Mut<'a, T> {
+        self.or_insert_with(|| val)
+    }
+
+    #[inline]
+    pub fn or_insert_with(self, f: impl FnOnce() -> T) -> Mut<'a, T> {
+        // If the resource does not have a value, insert one.
+        if !self.data.is_present() {
+            OwningPtr::make(f(), |val| {
+                // SAFETY: The owned pointer `val` has an erased type `T`,
+                // which matches the underlying type of the storage `self.data`.
+                unsafe { self.data.insert(val, self.change_tick) };
+            });
+        }
+        // SAFETY: The resource data must have value.
+        let (ptr, ticks) = unsafe { self.data.get_with_ticks().debug_checked_unwrap() };
+        // SAFETY: We have exclusive access to the resource storage.
+        let ptr = unsafe { ptr.assert_unique() };
+        Mut {
+            // SAFETY: `T` is the underlying type of `self.data`.
+            value: unsafe { ptr.deref_mut() },
+            // SAFETY: We have exclusive access to the resource storage.
+            ticks: unsafe {
+                Ticks::from_tick_cells(ticks, self.last_change_tick, self.change_tick)
+            },
         }
     }
 }
