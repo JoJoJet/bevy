@@ -1579,7 +1579,7 @@ impl<'a, T: 'static> ResourceEntry<'a, T> {
     /// * `component_id` must have been initialized with `world`.
     /// * The type associated with `component_id` must be `T`.
     #[inline]
-    pub(crate) unsafe fn new(world: &'a mut World, component_id: ComponentId) -> Self {
+    unsafe fn new(world: &'a mut World, component_id: ComponentId) -> Self {
         Self {
             world,
             component_id,
@@ -1612,7 +1612,7 @@ impl<'a, T: 'static> ResourceEntry<'a, T> {
         self
     }
 
-    /// Set the value of the resource if it is empty, then returns a mutable reference to it.
+    /// Sets the value of the resource if it is empty, then returns a mutable reference to it.
     ///
     /// # Examples
     /// ```
@@ -1663,7 +1663,7 @@ impl<'a, T: 'static> ResourceEntry<'a, T> {
         }
     }
 
-    /// Initialize the resource (using [`FromWorld`]) if it is empty, then returns a mutable reference to it.
+    /// Initializes the resource (using [`FromWorld`]) if it is empty, then returns a mutable reference to it.
     ///
     /// ```rust
     /// # use bevy_ecs::prelude::*;
