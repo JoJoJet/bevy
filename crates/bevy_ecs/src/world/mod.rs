@@ -1742,6 +1742,10 @@ impl<'a, T: 'static> ResourceEntry<'a, T> {
         self.or_init_with(T::from_world)
     }
 
+    /// Initializes the resource if it is empty, then returns a mutable reference to it.
+    ///
+    /// If you don't need `&mut World` within the closure, consider using [`Self::or_insert_with`],
+    /// which is slightly more efficient.
     #[inline]
     pub fn or_init_with(self, f: impl FnOnce(&mut World) -> T) -> Mut<'a, T> {
         let last_change_tick = self.world.last_change_tick();
