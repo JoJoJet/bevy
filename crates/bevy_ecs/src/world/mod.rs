@@ -1657,6 +1657,7 @@ impl<'a, T: 'static> ResourceEntry<'a, T> {
             // We must use pointers to erase the lifetime of `world`, since
             // the borrow checker mistakenly thinks that `data` is still borrowed,
             // even though it is no longer borrowed in this branch.
+            // This will be fixed by polonius. See: https://github.com/rust-lang/rust/issues/54663.
             // SAFETY: `world_ptr` was originally cast from a mutable reference, so it is valid for writes.
             let world = unsafe { &mut *world_ptr };
             return Self::Vacant(VacantResource {
