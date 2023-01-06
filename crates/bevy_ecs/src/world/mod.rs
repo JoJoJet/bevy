@@ -1626,10 +1626,10 @@ impl<T: Default> FromWorld for T {
 /// This struct is created by [`World::resource_entry`].
 pub enum ResourceEntry<'a, T: 'static> {
     Occupied(Mut<'a, T>),
-    Vacant(VacantResourceEntry<'a, T>),
+    Vacant(VacantResource<'a, T>),
 }
 
-pub struct VacantResourceEntry<'a, T: 'static> {
+pub struct VacantResource<'a, T: 'static> {
     world: &'a mut World,
     component_id: ComponentId,
     _marker: PhantomData<&'a mut T>,
@@ -1651,7 +1651,7 @@ impl<'a, T: 'static> ResourceEntry<'a, T> {
         // SAFETY: `data` is safe to dereference, since it was just cast from a mutable reference,
         // and there is no aliased mutable accesses.
         if !unsafe { &*data }.is_present() {
-            return Self::Vacant(VacantResourceEntry {
+            return Self::Vacant(VacantResource {
                 world,
                 component_id,
                 _marker: PhantomData,
@@ -1710,7 +1710,7 @@ impl<'a, T: 'static> ResourceEntry<'a, T> {
     pub fn or_insert_with(self, f: impl FnOnce(&mut World) -> T) -> Mut<'a, T> {
         match self {
             ResourceEntry::Occupied(x) => x,
-            ResourceEntry::Vacant(VacantResourceEntry {
+            ResourceEntry::Vacant(VacantResource {
                 world,
                 component_id,
                 _marker,
