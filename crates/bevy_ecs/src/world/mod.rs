@@ -1664,7 +1664,7 @@ impl<'a, T: 'static> ResourceEntry<'a, T> {
         // and no references to this data exist elsewhere.
         let data = unsafe { &mut *data };
 
-        // SAFETY: If the value must be present, or we would have returned early above.
+        // SAFETY: The value must be present, or we would have returned early above.
         let value = unsafe {
             data.get_mut_with_ticks(last_change_tick, change_tick)
                 .debug_checked_unwrap()
