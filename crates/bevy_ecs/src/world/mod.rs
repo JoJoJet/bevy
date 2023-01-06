@@ -1646,23 +1646,25 @@ impl<'a, T: 'static> ResourceEntry<'a, T> {
         let last_change_tick = world.last_change_tick();
         let change_tick = world.change_tick();
 
+        let world_ptr = world as *mut _;
+
         // SAFETY: `self.component_id` was initialized with `self.world`.
-        let data = unsafe { world.initialize_resource_internal(component_id) }
-            // we must erase the lifetime, or the borrow checker wont let us return early with `world`.
-            as *mut ResourceData;
-        // SAFETY: `data` is safe to dereference, since it was just cast from a mutable reference,
-        // and there is no aliased mutable accesses.
-        if !unsafe { &*data }.is_present() {
+        let data = unsafe { world.initialize_resource_internal(component_id) };
+        if !data.is_present() {
+            #[allow(clippy::forget_ref)]
+            std::mem::forget(data);
+
+            // We must use pointers to erase the lifetime of `world`, since
+            // the borrow checker mistakenly thinks that `data` is still borrowed,
+            // even though it is no longer borrowed in this branch.
+            // SAFETY: `world_ptr` was originally cast from a mutable reference, so it is valid for writes.
+            let world = unsafe { &mut *world_ptr };
             return Self::Vacant(VacantResource {
                 world,
                 component_id,
                 _marker: PhantomData,
             });
         }
-
-        // SAFETY: `data` is safe to dereference, since it was just cast from a mutable refence,
-        // and no references to this data exist elsewhere.
-        let data = unsafe { &mut *data };
 
         // SAFETY: The value must be present, or we would have returned early above.
         let value = unsafe {
