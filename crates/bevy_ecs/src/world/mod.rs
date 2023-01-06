@@ -958,7 +958,7 @@ impl World {
         &mut self,
         func: impl FnOnce() -> R,
     ) -> Mut<'_, R> {
-        self.resource_entry().or_insert_with(func)
+        self.resource_entry().or_insert_with(|_| func())
     }
 
     /// Gets a mutable reference to the resource of the given type, if it exists
@@ -1718,97 +1718,13 @@ impl<'a, T: 'static> ResourceEntry<'a, T> {
     /// ```
     #[inline]
     pub fn or_insert(self, val: T) -> Mut<'a, T> {
-        self.or_insert_with(|| val)
+        self.or_insert_with(|_| val)
     }
 
     /// Initializes the resource (using the specified closure) if it is empty,
     /// then returns a mutable reference to it.
-    ///
-    /// See [`Self::or_init_with`] for a variant that gives access to `&mut World`.
     #[inline]
-    pub fn or_insert_with(self, f: impl FnOnce() -> T) -> Mut<'a, T> {
-        let (ptr, ticks) = match self {
-            ResourceEntry::Occupied(OccupiedResourceEntry {
-                data,
-                last_change_tick,
-                change_tick,
-                _marker,
-            }) => {
-                let x = data.get_mut_with_ticks(last_change_tick, change_tick);
-                // SAFETY: `self` is `Occupied`, so the resource must have a value.
-                unsafe { x.debug_checked_unwrap() }
-            }
-            ResourceEntry::Vacant(VacantResourceEntry {
-                world,
-                component_id,
-                _marker,
-            }) => {
-                let last_change_tick = world.last_change_tick();
-                let change_tick = world.change_tick();
-
-                // SAFETY: The resource's backing storage was initialized in `Self::new`.
-                let data = unsafe {
-                    world
-                        .storages
-                        .resources
-                        .get_mut(component_id)
-                        .debug_checked_unwrap()
-                };
-                OwningPtr::make(f(), |val| {
-                    // SAFETY:
-                    // * The owned pointer `val` has an erased type `T`,
-                    //   which matches the underlying type of the resource storage.
-                    // * `self` is `Vacant`, so the resource storage must be empty.
-                    unsafe { data.insert_empty(val, change_tick) };
-                });
-
-                // SAFETY: The resource must have a value, since we just inserted one.
-                unsafe {
-                    data.get_mut_with_ticks(last_change_tick, change_tick)
-                        .debug_checked_unwrap()
-                }
-            }
-        };
-
-        // SAFETY: `T` is the underlying type of the resource.
-        let value = unsafe { ptr.deref_mut() };
-        Mut { value, ticks }
-    }
-
-    /// Initializes the resource (using [`FromWorld`]) if it is empty, then returns a mutable reference to it.
-    ///
-    /// ```rust
-    /// # use bevy_ecs::prelude::*;
-    /// #
-    /// #[derive(Resource, Debug, PartialEq, Eq)]
-    /// struct Counter(u64);
-    ///
-    /// impl FromWorld for Counter {
-    ///     fn from_world(_world: &mut World) -> Self {
-    ///         Self(0)
-    ///     }
-    /// }
-    ///
-    /// let mut world = World::new();
-    ///
-    /// // The resource does not have a value, so it will be initialized using `FromWorld`.
-    /// let val = world.resource_entry::<Counter>().or_init();
-    /// assert_eq!(*val, Counter(0));
-    /// ```
-    #[inline]
-    pub fn or_init(self) -> Mut<'a, T>
-    where
-        T: FromWorld,
-    {
-        self.or_init_with(T::from_world)
-    }
-
-    /// Initializes the resource if it is empty, then returns a mutable reference to it.
-    ///
-    /// If you don't need `&mut World` within the closure, consider using [`Self::or_insert_with`],
-    /// which is slightly more efficient.
-    #[inline]
-    pub fn or_init_with(self, f: impl FnOnce(&mut World) -> T) -> Mut<'a, T> {
+    pub fn or_insert_with(self, f: impl FnOnce(&mut World) -> T) -> Mut<'a, T> {
         let (ptr, ticks) = match self {
             ResourceEntry::Occupied(OccupiedResourceEntry {
                 data,
@@ -1857,6 +1773,34 @@ impl<'a, T: 'static> ResourceEntry<'a, T> {
         // SAFETY: `T` is the underlying type of the resource.
         let value = unsafe { ptr.deref_mut() };
         Mut { value, ticks }
+    }
+
+    /// Initializes the resource (using [`FromWorld`]) if it is empty, then returns a mutable reference to it.
+    ///
+    /// ```rust
+    /// # use bevy_ecs::prelude::*;
+    /// #
+    /// #[derive(Resource, Debug, PartialEq, Eq)]
+    /// struct Counter(u64);
+    ///
+    /// impl FromWorld for Counter {
+    ///     fn from_world(_world: &mut World) -> Self {
+    ///         Self(0)
+    ///     }
+    /// }
+    ///
+    /// let mut world = World::new();
+    ///
+    /// // The resource does not have a value, so it will be initialized using `FromWorld`.
+    /// let val = world.resource_entry::<Counter>().or_init();
+    /// assert_eq!(*val, Counter(0));
+    /// ```
+    #[inline]
+    pub fn or_init(self) -> Mut<'a, T>
+    where
+        T: FromWorld,
+    {
+        self.or_insert_with(T::from_world)
     }
 }
 
