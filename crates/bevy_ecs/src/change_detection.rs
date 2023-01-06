@@ -210,6 +210,9 @@ macro_rules! impl_methods {
             }
 
             /// Returns a `Mut<>` with a smaller lifetime.
+            ///
+            /// Note that calling [`DetectChanges::set_last_changed`] on the returned value
+            /// will not affect the original.
             pub fn reborrow(&mut self) -> Mut<'_, $target> {
                 Mut {
                     value: self.value,
