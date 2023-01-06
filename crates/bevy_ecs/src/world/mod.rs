@@ -1733,10 +1733,11 @@ impl<'a, T: 'static> ResourceEntry<'a, T> {
                 last_change_tick,
                 change_tick,
                 _marker,
-            }) => unsafe {
-                data.get_mut_with_ticks(last_change_tick, change_tick)
-                    .debug_checked_unwrap()
-            },
+            }) => {
+                let x = data.get_mut_with_ticks(last_change_tick, change_tick);
+                // SAFETY: `self` is `Occupied`, so the resource must have a value.
+                unsafe { x.debug_checked_unwrap() }
+            }
             ResourceEntry::Vacant(VacantResourceEntry {
                 world,
                 component_id,
@@ -1806,10 +1807,11 @@ impl<'a, T: 'static> ResourceEntry<'a, T> {
                 last_change_tick,
                 change_tick,
                 _marker,
-            }) => unsafe {
-                data.get_mut_with_ticks(last_change_tick, change_tick)
-                    .debug_checked_unwrap()
-            },
+            }) => {
+                let x = data.get_mut_with_ticks(last_change_tick, change_tick);
+                // SAFETY: `self` is `Occupied`, so the resource must have a value.
+                unsafe { x.debug_checked_unwrap() }
+            }
             ResourceEntry::Vacant(VacantResourceEntry {
                 world,
                 component_id,
