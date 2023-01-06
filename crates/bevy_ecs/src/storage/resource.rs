@@ -1,8 +1,8 @@
 use crate::archetype::ArchetypeComponentId;
-use crate::change_detection::Ticks;
+use crate::change_detection::{MutUntyped, Ticks};
 use crate::component::{ComponentId, ComponentTicks, Components, TickCells};
 use crate::storage::{Column, SparseSet, TableRow};
-use bevy_ptr::{OwningPtr, Ptr, PtrMut, UnsafeCellDeref};
+use bevy_ptr::{OwningPtr, Ptr, UnsafeCellDeref};
 
 /// The type-erased backing storage and metadata for a single resource within a [`World`].
 ///
@@ -49,13 +49,13 @@ impl ResourceData {
         &mut self,
         last_change_tick: u32,
         change_tick: u32,
-    ) -> Option<(PtrMut, Ticks)> {
+    ) -> Option<MutUntyped> {
         let (ptr, ticks) = self.column.get(Self::ROW)?;
         // SAFETY: We have exclusive access to the storage column.
-        let ptr = unsafe { ptr.assert_unique() };
+        let value = unsafe { ptr.assert_unique() };
         // SAFETY: We have exclusive access to the storage column and ticks.
         let ticks = unsafe { Ticks::from_tick_cells(ticks, last_change_tick, change_tick) };
-        Some((ptr, ticks))
+        Some(MutUntyped { value, ticks })
     }
 
     /// Inserts a value into the resource. If a value is already present

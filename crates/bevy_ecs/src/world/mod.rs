@@ -1663,15 +1663,12 @@ impl<'a, T: 'static> ResourceEntry<'a, T> {
         let data = unsafe { &mut *data };
 
         // SAFETY: If the value must be present, or we would have returned early above.
-        let (ptr, ticks) = unsafe {
+        let value = unsafe {
             data.get_mut_with_ticks(last_change_tick, change_tick)
                 .debug_checked_unwrap()
         };
 
-        Self::Occupied(Mut {
-            value: ptr.deref_mut(),
-            ticks,
-        })
+        Self::Occupied(value.with_type::<T>())
     }
 
     /// If the resource exists, allows modifying it before any potential inserts.
@@ -1749,14 +1746,13 @@ impl<'a, T: 'static> ResourceEntry<'a, T> {
                 });
 
                 // SAFETY: The resource must have a value, since we just inserted one.
-                let (ptr, ticks) = unsafe {
+                let value = unsafe {
                     data.get_mut_with_ticks(last_change_tick, change_tick)
                         .debug_checked_unwrap()
                 };
 
                 // SAFETY: `T` is the underlying type of the resource.
-                let value = unsafe { ptr.deref_mut() };
-                Mut { value, ticks }
+                unsafe { value.with_type::<T>() }
             }
         }
     }
