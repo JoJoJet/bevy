@@ -1739,6 +1739,11 @@ impl<'a, T: 'static> ResourceEntry<'a, T> {
     where
         T: FromWorld,
     {
+        self.or_init_with(T::from_world)
+    }
+
+    #[inline]
+    pub fn or_init_with(self, f: impl FnOnce(&mut World) -> T) -> Mut<'a, T> {
         let last_change_tick = self.world.last_change_tick();
         let change_tick = self.world.change_tick();
 
@@ -1756,7 +1761,7 @@ impl<'a, T: 'static> ResourceEntry<'a, T> {
             // SAFETY: the pointer `data` was just cast from a mutable reference.
             unsafe { &mut *data }
         } else {
-            let val = T::from_world(self.world);
+            let val = f(self.world);
 
             // SAFETY: `self.component_id` was initialized with `self.world`.
             let data = unsafe { self.world.initialize_resource_internal(self.component_id) };
