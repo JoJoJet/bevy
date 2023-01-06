@@ -1625,9 +1625,11 @@ impl<T: Default> FromWorld for T {
 /// Provides a view into the storage for a single [`Resource`].
 /// This struct is created by [`World::resource_entry`].
 pub enum ResourceEntry<'a, T: 'static> {
-    Occupied(Mut<'a, T>),
+    Occupied(OccupiedResource<'a, T>),
     Vacant(VacantResource<'a, T>),
 }
+
+pub struct OccupiedResource<'a, T: 'static>(Mut<'a, T>);
 
 pub struct VacantResource<'a, T: 'static> {
     world: &'a mut World,
@@ -1668,13 +1670,13 @@ impl<'a, T: 'static> ResourceEntry<'a, T> {
                 .debug_checked_unwrap()
         };
 
-        Self::Occupied(value.with_type::<T>())
+        Self::Occupied(OccupiedResource(value.with_type::<T>()))
     }
 
     /// If the resource exists, allows modifying it before any potential inserts.
     pub fn and_modify(mut self, f: impl FnOnce(Mut<T>)) -> Self {
         if let Self::Occupied(value) = &mut self {
-            f(value.reborrow());
+            f(value.0.reborrow());
         }
 
         self
@@ -1709,7 +1711,7 @@ impl<'a, T: 'static> ResourceEntry<'a, T> {
     #[inline]
     pub fn or_insert_with(self, f: impl FnOnce(&mut World) -> T) -> Mut<'a, T> {
         match self {
-            ResourceEntry::Occupied(x) => x,
+            ResourceEntry::Occupied(x) => x.0,
             ResourceEntry::Vacant(VacantResource {
                 world,
                 component_id,
