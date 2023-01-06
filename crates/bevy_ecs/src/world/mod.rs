@@ -1746,8 +1746,14 @@ impl<'a, T: 'static> ResourceEntry<'a, T> {
                 let last_change_tick = world.last_change_tick();
                 let change_tick = world.change_tick();
 
-                // SAFETY: `self.component_id` was initialized with `self.world`.
-                let data = unsafe { world.initialize_resource_internal(component_id) };
+                // SAFETY: The resource's backing storage was initialized in `Self::new`.
+                let data = unsafe {
+                    world
+                        .storages
+                        .resources
+                        .get_mut(component_id)
+                        .debug_checked_unwrap()
+                };
                 OwningPtr::make(f(), |val| {
                     // SAFETY: The owned pointer `val` has an erased type `T`,
                     // which matches the underlying type of the resource storage.
@@ -1822,8 +1828,14 @@ impl<'a, T: 'static> ResourceEntry<'a, T> {
 
                 let val = f(world);
 
-                // SAFETY: `self.component_id` was initialized with `self.world`.
-                let data = unsafe { world.initialize_resource_internal(component_id) };
+                // SAFETY: The resource's backing storage was initialized in `Self::new`.
+                let data = unsafe {
+                    world
+                        .storages
+                        .resources
+                        .get_mut(component_id)
+                        .debug_checked_unwrap()
+                };
                 OwningPtr::make(val, |val| {
                     // SAFETY: The owned pointer `val` has an erased type `T`,
                     // which matches the underlying type of the resource storage.
