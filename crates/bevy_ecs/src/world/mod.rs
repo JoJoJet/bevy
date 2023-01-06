@@ -1624,7 +1624,19 @@ impl<T: Default> FromWorld for T {
 
 /// Provides a view into the storage for a single [`Resource`].
 /// This struct is created by [`World::resource_entry`].
-pub struct ResourceEntry<'a, T: 'static> {
+pub enum ResourceEntry<'a, T: 'static> {
+    Occupied(OccupiedResourceEntry<'a, T>),
+    Vacant(VacantResourceEntry<'a, T>),
+}
+
+pub struct OccupiedResourceEntry<'a, T: 'static> {
+    data: &'a mut ResourceData,
+    last_change_tick: u32,
+    change_tick: u32,
+    _marker: PhantomData<&'a mut T>,
+}
+
+pub struct VacantResourceEntry<'a, T: 'static> {
     world: &'a mut World,
     component_id: ComponentId,
     _marker: PhantomData<&'a mut T>,
@@ -1636,25 +1648,47 @@ impl<'a, T: 'static> ResourceEntry<'a, T> {
     /// * The type associated with `component_id` must be `T`.
     #[inline]
     unsafe fn new(world: &'a mut World, component_id: ComponentId) -> Self {
-        Self {
-            world,
-            component_id,
-            _marker: PhantomData,
+        let last_change_tick = world.last_change_tick();
+        let change_tick = world.change_tick();
+
+        // SAFETY: `self.component_id` was initialized with `self.world`.
+        let data = unsafe { world.initialize_resource_internal(component_id) }
+            // we must erase the lifetime, or the borrow checker wont let us return early with `world`.
+            as *mut ResourceData;
+        // SAFETY: `data` is safe to dereference, since it was just cast from a mutable reference,
+        // and there is no aliased mutable accesses.
+        if !unsafe { &*data }.is_present() {
+            return Self::Vacant(VacantResourceEntry {
+                world,
+                component_id,
+                _marker: PhantomData,
+            });
         }
+
+        Self::Occupied(OccupiedResourceEntry {
+            // SAFETY: `data` is safe to dereference, since it was just cast from a mutable refence,
+            // and no references to this data exist elsewhere.
+            data: unsafe { &mut *data },
+            last_change_tick,
+            change_tick,
+            _marker: PhantomData,
+        })
     }
 
     /// If the resource exists, allows modifying it before any potential inserts.
-    pub fn and_modify(self, f: impl FnOnce(Mut<T>)) -> Self {
-        let last_change_tick = self.world.last_change_tick();
-        let change_tick = self.world.change_tick();
-
-        if let Some((ptr, ticks)) = self
-            .world
-            .storages
-            .resources
-            .get_mut(self.component_id)
-            .and_then(|data| data.get_mut_with_ticks(last_change_tick, change_tick))
+    pub fn and_modify(mut self, f: impl FnOnce(Mut<T>)) -> Self {
+        if let Self::Occupied(OccupiedResourceEntry {
+            ref mut data,
+            last_change_tick,
+            change_tick,
+            _marker,
+        }) = self
         {
+            // SAFETY: `self` is `Occupied`, so the resource must be present.
+            let (ptr, ticks) = unsafe {
+                data.get_mut_with_ticks(last_change_tick, change_tick)
+                    .debug_checked_unwrap()
+            };
             // SAFETY: `T` is the resource type corresponding to `self.component_id`.
             let value = unsafe { ptr.deref_mut() };
             f(Mut { value, ticks });
@@ -1693,24 +1727,38 @@ impl<'a, T: 'static> ResourceEntry<'a, T> {
     /// See [`Self::or_init_with`] for a variant that gives access to `&mut World`.
     #[inline]
     pub fn or_insert_with(self, f: impl FnOnce() -> T) -> Mut<'a, T> {
-        let last_change_tick = self.world.last_change_tick();
-        let change_tick = self.world.change_tick();
+        let (ptr, ticks) = match self {
+            ResourceEntry::Occupied(OccupiedResourceEntry {
+                data,
+                last_change_tick,
+                change_tick,
+                _marker,
+            }) => unsafe {
+                data.get_mut_with_ticks(last_change_tick, change_tick)
+                    .debug_checked_unwrap()
+            },
+            ResourceEntry::Vacant(VacantResourceEntry {
+                world,
+                component_id,
+                _marker,
+            }) => {
+                let last_change_tick = world.last_change_tick();
+                let change_tick = world.change_tick();
 
-        // SAFETY: `self.component_id` was initialized with `self.world`.
-        let data = unsafe { self.world.initialize_resource_internal(self.component_id) };
-        // If the resource does not have a value, insert one.
-        if !data.is_present() {
-            OwningPtr::make(f(), |val| {
-                // SAFETY: The owned pointer `val` has an erased type `T`,
-                // which matches the underlying type of the resource storage.
-                unsafe { data.insert(val, change_tick) };
-            });
-        }
+                // SAFETY: `self.component_id` was initialized with `self.world`.
+                let data = unsafe { world.initialize_resource_internal(component_id) };
+                OwningPtr::make(f(), |val| {
+                    // SAFETY: The owned pointer `val` has an erased type `T`,
+                    // which matches the underlying type of the resource storage.
+                    unsafe { data.insert(val, change_tick) };
+                });
 
-        // SAFETY: If the resource storage was originally empty, a value would have been inserted.
-        let (ptr, ticks) = unsafe {
-            data.get_mut_with_ticks(last_change_tick, change_tick)
-                .debug_checked_unwrap()
+                // SAFETY: The resource must have a value, since we just inserted one.
+                unsafe {
+                    data.get_mut_with_ticks(last_change_tick, change_tick)
+                        .debug_checked_unwrap()
+                }
+            }
         };
 
         // SAFETY: `T` is the underlying type of the resource.
@@ -1752,41 +1800,40 @@ impl<'a, T: 'static> ResourceEntry<'a, T> {
     /// which is slightly more efficient.
     #[inline]
     pub fn or_init_with(self, f: impl FnOnce(&mut World) -> T) -> Mut<'a, T> {
-        let last_change_tick = self.world.last_change_tick();
-        let change_tick = self.world.change_tick();
+        let (ptr, ticks) = match self {
+            ResourceEntry::Occupied(OccupiedResourceEntry {
+                data,
+                last_change_tick,
+                change_tick,
+                _marker,
+            }) => unsafe {
+                data.get_mut_with_ticks(last_change_tick, change_tick)
+                    .debug_checked_unwrap()
+            },
+            ResourceEntry::Vacant(VacantResourceEntry {
+                world,
+                component_id,
+                _marker,
+            }) => {
+                let last_change_tick = world.last_change_tick();
+                let change_tick = world.change_tick();
 
-        // Get or initialize the resource's backing storage.
-        let data = if let Some(data) = self
-            .world
-            .storages
-            .resources
-            .get_mut(self.component_id)
-            .filter(|data| data.is_present())
-            // we must erase the lifetime so the borrow checker doesn't
-            // think that `self.world` is borrowed in the `else` block.
-            .map(|x| x as *mut _)
-        {
-            // SAFETY: the pointer `data` was just cast from a mutable reference.
-            unsafe { &mut *data }
-        } else {
-            let val = f(self.world);
+                let val = f(world);
 
-            // SAFETY: `self.component_id` was initialized with `self.world`.
-            let data = unsafe { self.world.initialize_resource_internal(self.component_id) };
+                // SAFETY: `self.component_id` was initialized with `self.world`.
+                let data = unsafe { world.initialize_resource_internal(component_id) };
+                OwningPtr::make(val, |val| {
+                    // SAFETY: The owned pointer `val` has an erased type `T`,
+                    // which matches the underlying type of the resource storage.
+                    unsafe { data.insert(val, change_tick) };
+                });
 
-            OwningPtr::make(val, |val| {
-                // SAFETY: The owned pointer `val` has an erased type `T`,
-                // which matches the underlying type of the resource storage.
-                unsafe { data.insert(val, change_tick) };
-            });
-
-            data
-        };
-
-        // SAFETY: If the resource storage was originally empty, a value would have been inserted.
-        let (ptr, ticks) = unsafe {
-            data.get_mut_with_ticks(last_change_tick, change_tick)
-                .debug_checked_unwrap()
+                // SAFETY: The resource must have a value, since we just inserted one.
+                unsafe {
+                    data.get_mut_with_ticks(last_change_tick, change_tick)
+                        .debug_checked_unwrap()
+                }
+            }
         };
 
         // SAFETY: `T` is the underlying type of the resource.
