@@ -446,6 +446,7 @@ impl<'a> MutUntyped<'a> {
     }
 
     /// Transforms this [`MutUntyped`] into a [`Mut<T>`] with the same lifetime.
+    ///
     /// # Safety
     ///
     /// The value behind the pointer must be valid for `T`.
