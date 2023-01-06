@@ -209,6 +209,19 @@ macro_rules! impl_methods {
                 self.value
             }
 
+            /// Returns a `Mut<>` with a smaller lifetime.
+            pub fn reborrow(&mut self) -> Mut<'_, $target> {
+                Mut {
+                    value: self.value,
+                    ticks: Ticks {
+                        added: self.ticks.added,
+                        changed: self.ticks.changed,
+                        last_change_tick: self.ticks.last_change_tick,
+                        change_tick: self.ticks.change_tick,
+                    }
+                }
+            }
+
             /// Maps to an inner value by applying a function to the contained reference, without flagging a change.
             ///
             /// You should never modify the argument passed to the closure -- if you want to modify the data
