@@ -154,6 +154,7 @@ impl ResourceData {
 /// [`World`]: crate::world::World
 #[derive(Default)]
 pub struct Resources {
+    // SAFETY: Once initialized, the backing storage for a given `ComponentId` must never be removed.
     resources: SparseSet<ComponentId, ResourceData>,
 }
 
