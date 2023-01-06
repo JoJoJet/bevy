@@ -1755,9 +1755,11 @@ impl<'a, T: 'static> ResourceEntry<'a, T> {
                         .debug_checked_unwrap()
                 };
                 OwningPtr::make(f(), |val| {
-                    // SAFETY: The owned pointer `val` has an erased type `T`,
-                    // which matches the underlying type of the resource storage.
-                    unsafe { data.insert(val, change_tick) };
+                    // SAFETY:
+                    // * The owned pointer `val` has an erased type `T`,
+                    //   which matches the underlying type of the resource storage.
+                    // * `self` is `Vacant`, so the resource storage must be empty.
+                    unsafe { data.insert_empty(val, change_tick) };
                 });
 
                 // SAFETY: The resource must have a value, since we just inserted one.
@@ -1837,9 +1839,11 @@ impl<'a, T: 'static> ResourceEntry<'a, T> {
                         .debug_checked_unwrap()
                 };
                 OwningPtr::make(val, |val| {
-                    // SAFETY: The owned pointer `val` has an erased type `T`,
-                    // which matches the underlying type of the resource storage.
-                    unsafe { data.insert(val, change_tick) };
+                    // SAFETY:
+                    // * The owned pointer `val` has an erased type `T`,
+                    //   which matches the underlying type of the resource storage.
+                    // * `self` is `Vacant`, so the resource storage must be empty.
+                    unsafe { data.insert_empty(val, change_tick) };
                 });
 
                 // SAFETY: The resource must have a value, since we just inserted one.

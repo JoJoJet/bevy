@@ -77,6 +77,21 @@ impl ResourceData {
         }
     }
 
+    /// Inserts a value into the resource.
+    ///
+    /// # Safety
+    /// This instance must not already have a value.
+    ///
+    /// `value` must be valid for the underlying type for the resource.
+    ///
+    /// The underlying type must be [`Send`] or be inserted from the main thread.
+    /// This can be validated with [`World::validate_non_send_access_untyped`].
+    ///
+    /// [`World::validate_non_send_access_untyped`]: crate::world::World::validate_non_send_access_untyped
+    pub(crate) unsafe fn insert_empty(&mut self, value: OwningPtr, change_tick: u32) {
+        self.column.push(value, ComponentTicks::new(change_tick));
+    }
+
     /// Inserts a value into the resource with a pre-existing change tick. If a
     /// value is already present it will be replaced.
     ///
