@@ -1673,17 +1673,8 @@ impl<'a, T: 'static> ResourceEntry<'a, T> {
 
     /// If the resource exists, allows modifying it before any potential inserts.
     pub fn and_modify(mut self, f: impl FnOnce(Mut<T>)) -> Self {
-        if let Self::Occupied(Mut { value, ticks }) = &mut self {
-            let value = Mut::<T> {
-                value,
-                ticks: Ticks {
-                    added: ticks.added,
-                    changed: ticks.changed,
-                    last_change_tick: ticks.last_change_tick,
-                    change_tick: ticks.change_tick,
-                },
-            };
-            f(value);
+        if let Self::Occupied(value) = &mut self {
+            f(value.reborrow());
         }
 
         self
