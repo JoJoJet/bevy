@@ -34,7 +34,10 @@ mod map_entities;
 
 pub use map_entities::*;
 
-use crate::{archetype::ArchetypeId, storage::SparseSetIndex};
+use crate::{
+    archetype::{ArchetypeId, ArchetypeRow},
+    storage::{SparseSetIndex, TableId, TableRow},
+};
 use serde::{Deserialize, Serialize};
 use std::{convert::TryFrom, fmt, mem, sync::atomic::Ordering};
 
@@ -55,6 +58,9 @@ type IdCursor = isize;
 ///
 /// The identifier is implemented using a [generational index]: a combination of an index and a generation.
 /// This allows fast insertion after data removal in an array while minimizing loss of spatial locality.
+///
+/// These identifiers are only valid on the [`World`] it's sourced from. Attempting to use an `Entity` to
+/// fetch entity components or metadata from a different world will either fail or return unexpected results.
 ///
 /// [generational index]: https://lucassardois.medium.com/generational-indices-guide-8e3c5f7fd594
 ///
@@ -103,19 +109,25 @@ type IdCursor = isize;
 /// [`EntityMut::id`]: crate::world::EntityMut::id
 /// [`EntityCommands`]: crate::system::EntityCommands
 /// [`Query::get`]: crate::system::Query::get
+/// [`World`]: crate::world::World
 #[derive(Clone, Copy, Deserialize, Eq, Hash, Ord, PartialEq, PartialOrd, Serialize)]
 pub struct Entity {
-    pub(crate) generation: u32,
-    pub(crate) index: u32,
+    generation: u32,
+    index: u32,
 }
 
-pub enum AllocAtWithoutReplacement {
+pub(crate) enum AllocAtWithoutReplacement {
     Exists(EntityLocation),
     DidNotExist,
     ExistsWithWrongGeneration,
 }
 
 impl Entity {
+    #[cfg(test)]
+    pub(crate) const fn new(index: u32, generation: u32) -> Entity {
+        Entity { index, generation }
+    }
+
     /// An entity ID with a placeholder value. This may or may not correspond to an actual entity,
     /// and should be overwritten by a new value before being used.
     ///
@@ -266,9 +278,17 @@ impl<'a> Iterator for ReserveEntitiesIterator<'a> {
 impl<'a> core::iter::ExactSizeIterator for ReserveEntitiesIterator<'a> {}
 impl<'a> core::iter::FusedIterator for ReserveEntitiesIterator<'a> {}
 
-#[derive(Debug, Default)]
+/// A [`World`]'s internal metadata store on all of its entities.
+///
+/// Contains metadata on:
+///  - The generation of every entity.
+///  - The alive/dead status of a particular entity. (i.e. "has entity 3 been despawned?")
+///  - The location of the entity's components in memory (via [`EntityLocation`])
+///
+/// [`World`]: crate::world::World
+#[derive(Debug)]
 pub struct Entities {
-    pub(crate) meta: Vec<EntityMeta>,
+    meta: Vec<EntityMeta>,
 
     /// The `pending` and `free_cursor` fields describe three sets of Entity IDs
     /// that have been freed or are in the process of being allocated:
@@ -281,8 +301,8 @@ pub struct Entities {
     ///   `reserve_entities` or `reserve_entity()`. They are now waiting for `flush()` to make them
     ///   fully allocated.
     ///
-    /// - The count of new IDs that do not yet exist in `self.meta()`, but which we have handed out
-    ///   and reserved. `flush()` will allocate room for them in `self.meta()`.
+    /// - The count of new IDs that do not yet exist in `self.meta`, but which we have handed out
+    ///   and reserved. `flush()` will allocate room for them in `self.meta`.
     ///
     /// The contents of `pending` look like this:
     ///
@@ -312,6 +332,15 @@ pub struct Entities {
 }
 
 impl Entities {
+    pub(crate) const fn new() -> Self {
+        Entities {
+            meta: Vec::new(),
+            pending: Vec::new(),
+            free_cursor: AtomicIdCursor::new(0),
+            len: 0,
+        }
+    }
+
     /// Reserve entity IDs concurrently.
     ///
     /// Storage for entity generation and location is lazily allocated by calling `flush`.
@@ -448,7 +477,10 @@ impl Entities {
     /// Allocate a specific entity ID, overwriting its generation.
     ///
     /// Returns the location of the entity currently using the given ID, if any.
-    pub fn alloc_at_without_replacement(&mut self, entity: Entity) -> AllocAtWithoutReplacement {
+    pub(crate) fn alloc_at_without_replacement(
+        &mut self,
+        entity: Entity,
+    ) -> AllocAtWithoutReplacement {
         self.verify_flushed();
 
         let result = if entity.index as usize >= self.meta.len() {
@@ -523,6 +555,7 @@ impl Entities {
             .map_or(false, |e| e.generation() == entity.generation)
     }
 
+    /// Clears all [`Entity`] from the World.
     pub fn clear(&mut self) {
         self.meta.clear();
         self.pending.clear();
@@ -543,6 +576,18 @@ impl Entities {
         } else {
             None
         }
+    }
+
+    /// Updates the location of an [`Entity`]. This must be called when moving the components of
+    /// the entity around in storage.
+    ///
+    /// # Safety
+    ///  - `index` must be a valid entity index.
+    ///  - `location` must be valid for the entity at `index` or immediately made valid afterwards
+    ///    before handing control to unknown code.
+    pub(crate) unsafe fn set(&mut self, index: u32, location: EntityLocation) {
+        // SAFETY: Caller guarantees that `index` a valid entity index
+        self.meta.get_unchecked_mut(index as usize).location = location;
     }
 
     /// Get the [`Entity`] with a given id, if it exists in this [`Entities`] collection
@@ -646,29 +691,42 @@ impl Entities {
         self.len = count as u32;
     }
 
-    /// Accessor for getting the length of the vec in `self.meta`
+    /// The count of all entities in the [`World`] that have ever been allocated
+    /// including the entities that are currently freed.
+    ///
+    /// This does not include entities that have been reserved but have never been
+    /// allocated yet.
+    ///
+    /// [`World`]: crate::world::World
     #[inline]
-    pub fn meta_len(&self) -> usize {
+    pub fn total_count(&self) -> usize {
         self.meta.len()
     }
 
+    /// The count of currently allocated entities.
     #[inline]
     pub fn len(&self) -> u32 {
         self.len
     }
 
+    /// Checks if any entity is currently active.
     #[inline]
     pub fn is_empty(&self) -> bool {
         self.len == 0
     }
 }
 
+// This type is repr(C) to ensure that the layout and values within it can be safe to fully fill
+// with u8::MAX, as required by [`Entities::flush_and_reserve_invalid_assuming_no_entities`].
 // Safety:
 // This type must not contain any pointers at any level, and be safe to fully fill with u8::MAX.
+/// Metadata for an [`Entity`].
 #[derive(Copy, Clone, Debug)]
 #[repr(C)]
-pub struct EntityMeta {
+struct EntityMeta {
+    /// The current generation of the [`Entity`].
     pub generation: u32,
+    /// The current location of the [`Entity`]
     pub location: EntityLocation,
 }
 
@@ -677,20 +735,40 @@ impl EntityMeta {
         generation: 0,
         location: EntityLocation {
             archetype_id: ArchetypeId::INVALID,
-            index: usize::MAX, // dummy value, to be filled in
+            archetype_row: ArchetypeRow::INVALID, // dummy value, to be filled in
+            table_id: TableId::INVALID,
+            table_row: TableRow::INVALID, // dummy value, to be filled in
         },
     };
 }
 
+// This type is repr(C) to ensure that the layout and values within it can be safe to fully fill
+// with u8::MAX, as required by [`Entities::flush_and_reserve_invalid_assuming_no_entities`].
+// SAFETY:
+// This type must not contain any pointers at any level, and be safe to fully fill with u8::MAX.
 /// A location of an entity in an archetype.
 #[derive(Copy, Clone, Debug)]
 #[repr(C)]
 pub struct EntityLocation {
-    /// The archetype index
+    /// The ID of the [`Archetype`] the [`Entity`] belongs to.
+    ///
+    /// [`Archetype`]: crate::archetype::Archetype
     pub archetype_id: ArchetypeId,
 
-    /// The index of the entity in the archetype
-    pub index: usize,
+    /// The index of the [`Entity`] within its [`Archetype`].
+    ///
+    /// [`Archetype`]: crate::archetype::Archetype
+    pub archetype_row: ArchetypeRow,
+
+    /// The ID of the [`Table`] the [`Entity`] belongs to.
+    ///
+    /// [`Table`]: crate::storage::Table
+    pub table_id: TableId,
+
+    /// The index of the [`Entity`] within its [`Table`].
+    ///
+    /// [`Table`]: crate::storage::Table
+    pub table_row: TableRow,
 }
 
 #[cfg(test)]
@@ -708,7 +786,7 @@ mod tests {
 
     #[test]
     fn reserve_entity_len() {
-        let mut e = Entities::default();
+        let mut e = Entities::new();
         e.reserve_entity();
         // SAFETY: entity_location is left invalid
         unsafe { e.flush(|_, _| {}) };
@@ -717,7 +795,7 @@ mod tests {
 
     #[test]
     fn get_reserved_and_invalid() {
-        let mut entities = Entities::default();
+        let mut entities = Entities::new();
         let e = entities.reserve_entity();
         assert!(entities.contains(e));
         assert!(entities.get(e).is_none());
