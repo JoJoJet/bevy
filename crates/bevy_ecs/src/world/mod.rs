@@ -1625,15 +1625,8 @@ impl<T: Default> FromWorld for T {
 /// Provides a view into the storage for a single [`Resource`].
 /// This struct is created by [`World::resource_entry`].
 pub enum ResourceEntry<'a, T: 'static> {
-    Occupied(OccupiedResourceEntry<'a, T>),
+    Occupied(Mut<'a, T>),
     Vacant(VacantResourceEntry<'a, T>),
-}
-
-pub struct OccupiedResourceEntry<'a, T: 'static> {
-    data: &'a mut ResourceData,
-    last_change_tick: u32,
-    change_tick: u32,
-    _marker: PhantomData<&'a mut T>,
 }
 
 pub struct VacantResourceEntry<'a, T: 'static> {
@@ -1665,33 +1658,35 @@ impl<'a, T: 'static> ResourceEntry<'a, T> {
             });
         }
 
-        Self::Occupied(OccupiedResourceEntry {
-            // SAFETY: `data` is safe to dereference, since it was just cast from a mutable refence,
-            // and no references to this data exist elsewhere.
-            data: unsafe { &mut *data },
-            last_change_tick,
-            change_tick,
-            _marker: PhantomData,
+        // SAFETY: `data` is safe to dereference, since it was just cast from a mutable refence,
+        // and no references to this data exist elsewhere.
+        let data = unsafe { &mut *data };
+
+        // SAFETY: If the value must be present, or we would have returned early above.
+        let (ptr, ticks) = unsafe {
+            data.get_mut_with_ticks(last_change_tick, change_tick)
+                .debug_checked_unwrap()
+        };
+
+        Self::Occupied(Mut {
+            value: ptr.deref_mut(),
+            ticks,
         })
     }
 
     /// If the resource exists, allows modifying it before any potential inserts.
     pub fn and_modify(mut self, f: impl FnOnce(Mut<T>)) -> Self {
-        if let Self::Occupied(OccupiedResourceEntry {
-            ref mut data,
-            last_change_tick,
-            change_tick,
-            _marker,
-        }) = self
-        {
-            // SAFETY: `self` is `Occupied`, so the resource must be present.
-            let (ptr, ticks) = unsafe {
-                data.get_mut_with_ticks(last_change_tick, change_tick)
-                    .debug_checked_unwrap()
+        if let Self::Occupied(Mut { value, ticks }) = &mut self {
+            let value = Mut::<T> {
+                value,
+                ticks: Ticks {
+                    added: ticks.added,
+                    changed: ticks.changed,
+                    last_change_tick: ticks.last_change_tick,
+                    change_tick: ticks.change_tick,
+                },
             };
-            // SAFETY: `T` is the resource type corresponding to `self.component_id`.
-            let value = unsafe { ptr.deref_mut() };
-            f(Mut { value, ticks });
+            f(value);
         }
 
         self
@@ -1725,17 +1720,8 @@ impl<'a, T: 'static> ResourceEntry<'a, T> {
     /// then returns a mutable reference to it.
     #[inline]
     pub fn or_insert_with(self, f: impl FnOnce(&mut World) -> T) -> Mut<'a, T> {
-        let (ptr, ticks) = match self {
-            ResourceEntry::Occupied(OccupiedResourceEntry {
-                data,
-                last_change_tick,
-                change_tick,
-                _marker,
-            }) => {
-                let x = data.get_mut_with_ticks(last_change_tick, change_tick);
-                // SAFETY: `self` is `Occupied`, so the resource must have a value.
-                unsafe { x.debug_checked_unwrap() }
-            }
+        match self {
+            ResourceEntry::Occupied(x) => x,
             ResourceEntry::Vacant(VacantResourceEntry {
                 world,
                 component_id,
@@ -1763,16 +1749,16 @@ impl<'a, T: 'static> ResourceEntry<'a, T> {
                 });
 
                 // SAFETY: The resource must have a value, since we just inserted one.
-                unsafe {
+                let (ptr, ticks) = unsafe {
                     data.get_mut_with_ticks(last_change_tick, change_tick)
                         .debug_checked_unwrap()
-                }
-            }
-        };
+                };
 
-        // SAFETY: `T` is the underlying type of the resource.
-        let value = unsafe { ptr.deref_mut() };
-        Mut { value, ticks }
+                // SAFETY: `T` is the underlying type of the resource.
+                let value = unsafe { ptr.deref_mut() };
+                Mut { value, ticks }
+            }
+        }
     }
 
     /// Initializes the resource (using [`FromWorld`]) if it is empty, then returns a mutable reference to it.
