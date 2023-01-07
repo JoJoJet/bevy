@@ -882,6 +882,43 @@ impl World {
             .unwrap_or(false)
     }
 
+    /// Entry API for [`Resource`]s.
+    /// See [`HashMap::entry`]
+    ///
+    /// [`HashMap::entry`]: std::collections::HashMap::entry
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use bevy_ecs::prelude::*;
+    /// let mut world = World::new();
+    ///
+    /// #[derive(Resource, PartialEq)]
+    /// struct A(u32);
+    ///
+    /// let a = world
+    ///     .resource_entry()
+    ///     // `and_modify` allows you to modify the resource if it already exists.
+    ///     // The resource does not exist, so the closure will not be called.
+    ///     .and_modify(|_| unreachable!())
+    ///     // `or_insert` allows you to set a value for the resource if it does not exist yet.
+    ///     .or_insert(A(0));
+    ///
+    /// // The resource was initialized.
+    /// assert_eq!(a, A(0));
+    ///
+    /// let a = world
+    ///     .resource_entry()  
+    ///     // The resource has a value, so this time the closure will be run.
+    ///     .and_modify(|a| a.0 += 1)
+    ///     // `or_insert_with` allows lazily creating a value for the resource
+    ///     // if it does not already have one. It *does* have a value, so
+    ///     // so the closure will not be called.
+    ///     .or_insert_with(|_| unreachable!());
+    ///
+    /// // `and_modify` incremented the value of the resource.
+    /// assert_eq!(a, A(1));
+    /// ```
     pub fn resource_entry<T: Resource>(&mut self) -> ResourceEntry<T> {
         let id = self.components.init_resource::<T>();
         // SAFETY: `id` was initialized with `self`. The underlying type of `data` is `T`.
