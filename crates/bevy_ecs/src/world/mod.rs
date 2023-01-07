@@ -1701,7 +1701,7 @@ impl<'a, T: 'static> ResourceEntry<'a, T> {
     /// assert_eq!(*val, Counter(0));
     ///
     /// // The resource already has a value, so it will keep its old one.
-    /// let val = world.resource_entry().or_insert(Counter(0));
+    /// let val = world.resource_entry().or_insert(Counter(1));
     /// assert_eq!(*val, Counter(0));
     /// ```
     #[inline]
