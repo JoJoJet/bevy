@@ -97,11 +97,9 @@ use std::{cell::UnsafeCell, marker::PhantomData};
 /// |Struct name|`mutable` only|Description|
 /// |:---:|:---:|---|
 /// |`XState`|---|Used as the [`State`] type for `X` and `XReadOnly`|
-/// |`XItem`|---|The type of the query item for `X`|
 /// |`XFetch`|---|Used as the [`Fetch`] type for `X`|
-/// |`XReadOnlyItem`|✓|The type of the query item for `XReadOnly`|
-/// |`XReadOnlyFetch`|✓|Used as the [`Fetch`] type for `XReadOnly`|
 /// |`XReadOnly`|✓|[`ReadOnly`] variant of `X`|
+/// |`XReadOnlyFetch`|✓|Used as the [`Fetch`] type for `XReadOnly`|
 ///
 /// ## Adding mutable references
 ///
@@ -141,7 +139,7 @@ use std::{cell::UnsafeCell, marker::PhantomData};
 ///
 /// It is possible to add methods to query items in order to write reusable logic about related components.
 /// This will often make systems more readable because low level logic is moved out from them.
-/// It is done by adding `impl` blocks with methods for the `-Item` or `-ReadOnlyItem` generated structs.
+/// It is done by adding `impl` blocks with methods for the `-ReadOnly` generated structs.
 ///
 /// ```
 /// # use bevy_ecs::prelude::*;
@@ -179,11 +177,11 @@ use std::{cell::UnsafeCell, marker::PhantomData};
 /// }
 ///
 /// fn my_system(mut health_query: Query<HealthQuery>) {
-///     // The item returned by the iterator is of type `HealthQueryReadOnlyItem`.
+///     // The item returned by the iterator is of type `HealthQueryReadOnly`.
 ///     for health in health_query.iter() {
 ///         println!("Total: {}", health.total());
 ///     }
-///     // The item returned by the iterator is of type `HealthQueryItem`.
+///     // The item returned by the iterator is of type `HealthQuery`.
 ///     for mut health in &mut health_query {
 ///         health.damage(1.0);
 ///         println!("Total (mut): {}", health.total());
