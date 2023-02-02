@@ -435,7 +435,7 @@ macro_rules! impl_tick_filter {
         $get_sparse_set: expr
     ) => {
         $(#[$meta])*
-        pub struct $name<T>(PhantomData<T>);
+        pub struct $name<T>(pub <T as AsType<bool>>::Item);
 
         #[doc(hidden)]
         $(#[$fetch_meta])*
@@ -450,12 +450,12 @@ macro_rules! impl_tick_filter {
         // SAFETY: `Self::ReadOnly` is the same as `Self`
         unsafe impl<T: Component> WorldQuery for $name<T> {
             type Fetch<'w> = $fetch_name<'w, T>;
-            type Item<'w> = bool;
+            type Item<'w> = Self;
             type ReadOnly = Self;
             type State = ComponentId;
 
-            fn shrink<'wlong: 'wshort, 'wshort>(item: Self::Item<'wlong>) -> Self::Item<'wshort> {
-                item
+            fn shrink<'wlong: 'wshort, 'wshort>($name(val): Self::Item<'wlong>) -> Self::Item<'wshort> {
+                $name(val)
             }
 
             unsafe fn init_fetch<'w>(world: &'w World, &id: &ComponentId, last_change_tick: u32, change_tick: u32) -> Self::Fetch<'w> {
@@ -528,6 +528,15 @@ macro_rules! impl_tick_filter {
                 entity: Entity,
                 table_row: TableRow
             ) -> Self::Item<'w> {
+                Self(Self::filter_fetch(fetch, entity, table_row))
+            }
+
+            #[inline(always)]
+            unsafe fn filter_fetch<'w>(
+                fetch: &mut Self::Fetch<'w>,
+                entity: Entity,
+                table_row: TableRow
+            ) -> bool {
                 match T::Storage::STORAGE_TYPE {
                     StorageType::Table => {
                         fetch
@@ -547,15 +556,6 @@ macro_rules! impl_tick_filter {
                             .is_older_than(fetch.last_change_tick, fetch.change_tick)
                     }
                 }
-            }
-
-            #[inline(always)]
-            unsafe fn filter_fetch<'w>(
-                fetch: &mut Self::Fetch<'w>,
-                entity: Entity,
-                table_row: TableRow
-            ) -> bool {
-                Self::fetch(fetch, entity, table_row)
             }
 
             #[inline]
