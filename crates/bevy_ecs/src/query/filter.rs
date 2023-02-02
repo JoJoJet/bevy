@@ -255,7 +255,7 @@ unsafe impl<T: Component> ReadOnlyWorldQuery for Without<T> {}
 /// }
 /// # bevy_ecs::system::assert_is_system(print_cool_entity_system);
 /// ```
-pub struct Or<T: ?Sized>(pub <T as OrArg>::Bool);
+pub struct Or<T: ?Sized>(pub <T as AsType<bool>>::Item);
 
 impl<T: ?Sized> Clone for Or<T> {
     fn clone(&self) -> Self {
@@ -269,12 +269,12 @@ impl<T: ?Sized> Copy for Or<T> {}
 /// without needing [`PhantomData`] for the type arguments.
 /// This trait is implemented for all types.
 #[doc(hidden)]
-pub trait OrArg {
-    type Bool: 'static;
+pub trait AsType<T> {
+    type Item;
 }
 
-impl<T: ?Sized> OrArg for T {
-    type Bool = bool;
+impl<T: ?Sized, U> AsType<U> for T {
+    type Item = U;
 }
 
 #[doc(hidden)]
