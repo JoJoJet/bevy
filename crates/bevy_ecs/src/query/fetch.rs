@@ -74,12 +74,11 @@ use std::{cell::UnsafeCell, marker::PhantomData};
 /// # struct ComponentB;
 ///
 /// #[derive(WorldQuery)]
-/// struct MyQuery {
+/// struct MyQuery<'a> {
 ///     entity: Entity,
-///     // It is required that all reference lifetimes are explicitly annotated, just like in any
-///     // struct. Each lifetime should be 'static.
-///     component_a: &'static ComponentA,
-///     component_b: &'static ComponentB,
+///     // It is required that all reference lifetimes are explicitly annotated, just like in any struct.
+///     component_a: &'a ComponentA,
+///     component_b: &'a ComponentB,
 /// }
 ///
 /// fn my_system(query: Query<MyQuery>) {
@@ -133,8 +132,8 @@ use std::{cell::UnsafeCell, marker::PhantomData};
 /// #
 /// #[derive(WorldQuery)]
 /// #[world_query(mutable)]
-/// struct CustomQuery {
-///     component_a: &'static mut ComponentA,
+/// struct CustomQuery<'a> {
+///     component_a: Mut<'a, ComponentA>,
 /// }
 /// ```
 ///
@@ -156,26 +155,26 @@ use std::{cell::UnsafeCell, marker::PhantomData};
 ///
 /// #[derive(WorldQuery)]
 /// #[world_query(mutable)]
-/// struct HealthQuery {
-///     health: &'static mut Health,
-///     buff: Option<&'static mut Buff>,
+/// struct HealthQuery<'a> {
+///     health: Mut<'a, Health>,
+///     buff: Option<Mut<'a, Buff>>,
 /// }
 ///
-/// // `HealthQueryItem` is only available when accessing the query with mutable methods.
-/// impl<'w> HealthQueryItem<'w> {
+/// // `HealthQuery` is only available when accessing the query with mutable methods.
+/// impl<'w> HealthQuery<'w> {
 ///     fn damage(&mut self, value: f32) {
 ///         self.health.0 -= value;
 ///     }
 ///
 ///     fn total(&self) -> f32 {
-///         self.health.0 + self.buff.as_deref().map_or(0.0, |Buff(buff)| *buff)
+///         self.health.0 + self.buff.as_deref().map_or(0.0, |buff| buff.0)
 ///     }
 /// }
 ///
-/// // `HealthQueryReadOnlyItem` is only available when accessing the query with immutable methods.
-/// impl<'w> HealthQueryReadOnlyItem<'w> {
+/// // `HealthQueryReadOnly` is only available when accessing the query with immutable methods.
+/// impl<'w> HealthQueryReadOnly<'w> {
 ///     fn total(&self) -> f32 {
-///         self.health.0 + self.buff.map_or(0.0, |Buff(buff)| *buff)
+///         self.health.0 + self.buff.as_deref().map_or(0.0, |buff| buff.0)
 ///     }
 /// }
 ///
@@ -210,15 +209,15 @@ use std::{cell::UnsafeCell, marker::PhantomData};
 /// # struct ComponentC;
 /// #
 /// #[derive(WorldQuery)]
-/// struct SubQuery {
-///     component_a: &'static ComponentA,
-///     component_b: &'static ComponentB,
+/// struct SubQuery<'a> {
+///     component_a: &'a ComponentA,
+///     component_b: &'a ComponentB,
 /// }
 ///
 /// #[derive(WorldQuery)]
-/// struct MyQuery {
-///     subquery: SubQuery,
-///     component_c: &'static ComponentC,
+/// struct MyQueryM<'a> {
+///     subquery: SubQuery<'a>,
+///     component_c: &'a ComponentC,
 /// }
 /// ```
 ///
