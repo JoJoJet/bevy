@@ -61,6 +61,7 @@ impl<T> DebugCheckedUnwrap for Option<T> {
 #[cfg(test)]
 mod tests {
     use super::{ReadOnlyWorldQuery, WorldQuery};
+    use crate::change_detection::Mut;
     use crate::prelude::{AnyOf, Entity, Or, QueryState, With, Without};
     use crate::query::{ArchetypeFilter, QueryCombinationIter};
     use crate::system::{IntoSystem, Query, System, SystemState};
@@ -464,8 +465,11 @@ mod tests {
         world.spawn(A(2));
         world.spawn(C(3));
 
-        let values: Vec<(Option<&A>, Option<&B>)> =
-            world.query::<AnyOf<(&A, &B)>>().iter(&world).collect();
+        let values: Vec<(Option<&A>, Option<&B>)> = world
+            .query::<AnyOf<(&A, &B)>>()
+            .iter(&world)
+            .map(|AnyOf((a, b))| (a, b))
+            .collect();
 
         assert_eq!(
             values,
@@ -478,9 +482,9 @@ mod tests {
     fn self_conflicting_worldquery() {
         #[derive(WorldQuery)]
         #[world_query(mutable)]
-        struct SelfConflicting {
-            a: &'static mut A,
-            b: &'static mut A,
+        struct SelfConflicting<'a> {
+            a: Mut<'a, A>,
+            b: Mut<'a, A>,
         }
 
         let mut world = World::new();
@@ -514,9 +518,9 @@ mod tests {
 
         {
             #[derive(WorldQuery)]
-            struct CustomAB {
-                a: &'static A,
-                b: &'static B,
+            struct CustomAB<'a> {
+                a: &'a A,
+                b: &'a B,
             }
 
             let custom_param_data = world
@@ -534,16 +538,16 @@ mod tests {
 
         {
             #[derive(WorldQuery)]
-            struct FancyParam {
+            struct FancyParam<'a> {
                 e: Entity,
-                b: &'static B,
-                opt: Option<&'static Sparse>,
+                b: &'a B,
+                opt: Option<&'a Sparse>,
             }
 
             let custom_param_data = world
                 .query::<FancyParam>()
                 .iter(&world)
-                .map(|fancy| (fancy.e, *fancy.b, fancy.opt.copied()))
+                .map(|FancyParam { e, b, opt }| (e, *b, opt.copied()))
                 .collect::<Vec<_>>();
             let normal_data = world
                 .query::<(Entity, &B, Option<&Sparse>)>()
@@ -555,22 +559,22 @@ mod tests {
 
         {
             #[derive(WorldQuery)]
-            struct MaybeBSparse {
-                blah: Option<(&'static B, &'static Sparse)>,
+            struct MaybeBSparse<'a> {
+                blah: Option<(&'a B, &'a Sparse)>,
             }
             #[derive(WorldQuery)]
-            struct MatchEverything {
-                abcs: AnyOf<(&'static A, &'static B, &'static C)>,
-                opt_bsparse: MaybeBSparse,
+            struct MatchEverything<'a> {
+                abcs: AnyOf<(&'a A, &'a B, &'a C)>,
+                opt_bsparse: MaybeBSparse<'a>,
             }
 
             let custom_param_data = world
                 .query::<MatchEverything>()
                 .iter(&world)
                 .map(
-                    |MatchEverythingItem {
-                         abcs: (a, b, c),
-                         opt_bsparse: MaybeBSparseItem { blah: bsparse },
+                    |MatchEverything {
+                         abcs: AnyOf((a, b, c)),
+                         opt_bsparse: MaybeBSparse { blah: bsparse },
                      }| {
                         (
                             (a.copied(), b.copied(), c.copied()),
@@ -582,7 +586,7 @@ mod tests {
             let normal_data = world
                 .query::<(AnyOf<(&A, &B, &C)>, Option<(&B, &Sparse)>)>()
                 .iter(&world)
-                .map(|((a, b, c), bsparse)| {
+                .map(|(AnyOf((a, b, c)), bsparse)| {
                     (
                         (a.copied(), b.copied(), c.copied()),
                         bsparse.map(|(b, sparse)| (*b, *sparse)),
@@ -652,9 +656,9 @@ mod tests {
 
         {
             #[derive(WorldQuery)]
-            struct IterCombAB {
-                a: &'static A,
-                b: &'static B,
+            struct IterCombAB<'w> {
+                a: &'w A,
+                b: &'w B,
             }
 
             let custom_param_data = world

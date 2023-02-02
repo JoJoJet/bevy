@@ -96,14 +96,14 @@ impl std::fmt::Display for Name {
 /// # bevy_ecs::system::assert_is_system(increment_score);
 /// ```
 #[derive(WorldQuery)]
-pub struct DebugName {
+pub struct DebugName<'a> {
     /// A [`Name`] that the entity might have that is displayed if available.
-    pub name: Option<&'static Name>,
+    pub name: Option<&'a Name>,
     /// The unique identifier of the entity as a fallback.
     pub entity: Entity,
 }
 
-impl<'a> std::fmt::Debug for DebugNameItem<'a> {
+impl<'a> std::fmt::Debug for DebugName<'a> {
     #[inline(always)]
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self.name {

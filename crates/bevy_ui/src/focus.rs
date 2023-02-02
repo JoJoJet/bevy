@@ -7,6 +7,7 @@ use bevy_ecs::{
     query::WorldQuery,
     reflect::ReflectComponent,
     system::{Local, Query, Res},
+    world::Mut,
 };
 use bevy_input::{mouse::MouseButton, touch::Touches, Input};
 use bevy_math::Vec2;
@@ -115,15 +116,15 @@ pub struct State {
 /// Main query for [`ui_focus_system`]
 #[derive(WorldQuery)]
 #[world_query(mutable)]
-pub struct NodeQuery {
+pub struct NodeQuery<'a> {
     entity: Entity,
-    node: &'static Node,
-    global_transform: &'static GlobalTransform,
-    interaction: Option<&'static mut Interaction>,
-    relative_cursor_position: Option<&'static mut RelativeCursorPosition>,
-    focus_policy: Option<&'static FocusPolicy>,
-    calculated_clip: Option<&'static CalculatedClip>,
-    computed_visibility: Option<&'static ComputedVisibility>,
+    node: &'a Node,
+    global_transform: &'a GlobalTransform,
+    interaction: Option<Mut<'a, Interaction>>,
+    relative_cursor_position: Option<Mut<'a, RelativeCursorPosition>>,
+    focus_policy: Option<&'a FocusPolicy>,
+    calculated_clip: Option<&'a CalculatedClip>,
+    computed_visibility: Option<&'a ComputedVisibility>,
 }
 
 /// The system that sets Interaction for all UI elements based on the mouse cursor activity

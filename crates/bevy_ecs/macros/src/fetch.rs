@@ -13,12 +13,10 @@ use crate::bevy_ecs_path;
 #[derive(Default)]
 struct FetchStructAttributes {
     pub is_mutable: bool,
-    pub is_reflexive: bool,
     pub derive_args: Punctuated<syn::NestedMeta, syn::token::Comma>,
 }
 
 static MUTABLE_ATTRIBUTE_NAME: &str = "mutable";
-static REFLEXIVE_ATTRIBUTE_NAME: &str = "reflexive";
 static DERIVE_ATTRIBUTE_NAME: &str = "derive";
 
 mod field_attr_keywords {
@@ -55,14 +53,6 @@ pub fn derive_world_query_impl(ast: DeriveInput) -> TokenStream {
                     } else {
                         panic!(
                             "The `{MUTABLE_ATTRIBUTE_NAME}` attribute is expected to have no value or arguments",
-                        );
-                    }
-                } else if ident == REFLEXIVE_ATTRIBUTE_NAME {
-                    if let syn::Meta::Path(_) = meta {
-                        fetch_struct_attributes.is_reflexive = true;
-                    } else {
-                        panic!(
-                            "The `{REFLEXIVE_ATTRIBUTE_NAME}` attribute is expected to have no value or arguments",
                         );
                     }
                 } else if ident == DERIVE_ATTRIBUTE_NAME {
@@ -114,21 +104,11 @@ pub fn derive_world_query_impl(ast: DeriveInput) -> TokenStream {
         struct_name.clone()
     };
 
-    let item_struct_name = if fetch_struct_attributes.is_reflexive {
-        struct_name.clone()
+    let item_struct_name = struct_name.clone();
+    let read_only_item_struct_name = if fetch_struct_attributes.is_mutable {
+        Ident::new(&format!("{struct_name}ReadOnly"), Span::call_site())
     } else {
-        Ident::new(&format!("{struct_name}Item"), Span::call_site())
-    };
-    let read_only_item_struct_name = if fetch_struct_attributes.is_reflexive {
-        if fetch_struct_attributes.is_mutable {
-            Ident::new(&format!("{struct_name}ReadOnly"), Span::call_site())
-        } else {
-            item_struct_name.clone()
-        }
-    } else if fetch_struct_attributes.is_mutable {
-        Ident::new(&format!("{struct_name}ReadOnlyItem"), Span::call_site())
-    } else {
-        Ident::new(&format!("{struct_name}Item"), Span::call_site())
+        item_struct_name.clone()
     };
 
     let fetch_struct_name = Ident::new(&format!("{struct_name}Fetch"), Span::call_site());
@@ -177,10 +157,6 @@ pub fn derive_world_query_impl(ast: DeriveInput) -> TokenStream {
         }
     }
 
-    let derive_args = &fetch_struct_attributes.derive_args;
-    // `#[derive()]` is valid syntax
-    let derive_macro_call = quote! { #[derive(#derive_args)] };
-
     let impl_fetch = |is_readonly: bool| {
         let struct_name = if is_readonly {
             &read_only_struct_name
@@ -204,30 +180,7 @@ pub fn derive_world_query_impl(ast: DeriveInput) -> TokenStream {
             &field_types
         };
 
-        let item_def = if fetch_struct_attributes.is_reflexive {
-            quote! { #struct_name <#(#replaced_lifetimes,)* #(#lifetimeless_user_generics,)*> }
-        } else {
-            quote! { #item_struct_name #user_ty_generics_with_world }
-        };
-
-        let mut item_struct_declaration = quote! {
-            #derive_macro_call
-            #[doc = "Automatically generated [`WorldQuery`] item type for [`"]
-            #[doc = stringify!(#struct_name)]
-            #[doc = "`], returned when iterating over query results."]
-            #[automatically_derived]
-            #visibility struct #item_struct_name #user_impl_generics_with_world #user_where_clauses_with_world {
-                #(#(#field_attrs)* #field_visibilities #field_idents: <#field_types as #path::query::WorldQuery>::Item<'__w>,)*
-                #(#(#ignored_field_attrs)* #ignored_field_visibilities #ignored_field_idents: #ignored_field_types,)*
-            }
-        };
-        if fetch_struct_attributes.is_reflexive {
-            item_struct_declaration = quote! {};
-        }
-
         quote! {
-            #item_struct_declaration
-
             #[doc(hidden)]
             #[doc = "Automatically generated internal [`WorldQuery`] fetch type for [`"]
             #[doc = stringify!(#struct_name)]
@@ -242,7 +195,7 @@ pub fn derive_world_query_impl(ast: DeriveInput) -> TokenStream {
             unsafe impl #user_impl_generics #path::query::WorldQuery
                 for #struct_name #user_ty_generics #user_where_clauses {
 
-                type Item<'__w> = #item_def;
+                type Item<'__w> = #struct_name <#(#replaced_lifetimes,)* #(#lifetimeless_user_generics,)*>;
                 type Fetch<'__w> = #fetch_struct_name #user_ty_generics_with_world;
                 type ReadOnly = #read_only_struct_name #user_ty_generics;
                 type State = #state_struct_name #user_ty_generics;
