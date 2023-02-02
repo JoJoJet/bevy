@@ -44,11 +44,13 @@ pub struct With<T>(PhantomData<T>);
 // SAFETY: `Self::ReadOnly` is the same as `Self`
 unsafe impl<T: Component> WorldQuery for With<T> {
     type Fetch<'w> = ();
-    type Item<'w> = ();
+    type Item<'w> = Self;
     type ReadOnly = Self;
     type State = ComponentId;
 
-    fn shrink<'wlong: 'wshort, 'wshort>(_: Self::Item<'wlong>) -> Self::Item<'wshort> {}
+    fn shrink<'wlong: 'wshort, 'wshort>(this: Self::Item<'wlong>) -> Self::Item<'wshort> {
+        this
+    }
 
     unsafe fn init_fetch(
         _world: &World,
@@ -87,6 +89,7 @@ unsafe impl<T: Component> WorldQuery for With<T> {
         _entity: Entity,
         _table_row: TableRow,
     ) -> Self::Item<'w> {
+        Self(PhantomData)
     }
 
     #[inline]
@@ -146,11 +149,13 @@ pub struct Without<T>(PhantomData<T>);
 // SAFETY: `Self::ReadOnly` is the same as `Self`
 unsafe impl<T: Component> WorldQuery for Without<T> {
     type Fetch<'w> = ();
-    type Item<'w> = ();
+    type Item<'w> = Self;
     type ReadOnly = Self;
     type State = ComponentId;
 
-    fn shrink<'wlong: 'wshort, 'wshort>(_: Self::Item<'wlong>) -> Self::Item<'wshort> {}
+    fn shrink<'wlong: 'wshort, 'wshort>(this: Self::Item<'wlong>) -> Self::Item<'wshort> {
+        this
+    }
 
     unsafe fn init_fetch(
         _world: &World,
@@ -189,6 +194,7 @@ unsafe impl<T: Component> WorldQuery for Without<T> {
         _entity: Entity,
         _table_row: TableRow,
     ) -> Self::Item<'w> {
+        Self(PhantomData)
     }
 
     #[inline]
