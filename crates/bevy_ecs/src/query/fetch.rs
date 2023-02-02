@@ -1429,10 +1429,8 @@ macro_rules! impl_tuple_fetch {
 /// Entities are guaranteed to have at least one of the components in `T`.
 pub struct AnyOf<T: AnyOfArg>(pub T::Item);
 
+#[doc(hidden)]
 /// Types that can be used with [`AnyOf`].
-/// This trait is implemented by tuples of [`SystemParam`] types.
-///
-/// [`SystemParam`]: crate::system::SystemParam
 pub trait AnyOfArg {
     type Item;
 }
