@@ -1427,24 +1427,35 @@ macro_rules! impl_tuple_fetch {
 /// `Query<AnyOf<(&A, &B, &mut C)>>` is equivalent to `Query<(Option<&A>, Option<&B>, Option<&mut C>), Or<(With<A>, With<B>, With<C>)>>`.
 /// Each of the components in `T` is returned as an `Option`, as with `Option<A>` queries.
 /// Entities are guaranteed to have at least one of the components in `T`.
-pub struct AnyOf<T>(PhantomData<T>);
+pub struct AnyOf<'a, T: AnyOfArg>(pub T::Item<'a>);
+
+/// Types that can be used with [`AnyOf`].
+/// This trait is implemented by tuples of [`SystemParam`] types.
+///
+/// [`SystemParam`]: crate::system::SystemParam
+pub trait AnyOfArg {
+    type Item<'a>;
+}
 
 macro_rules! impl_anytuple_fetch {
     ($(($name: ident, $state: ident)),*) => {
+        impl<$($name: WorldQuery,)*> AnyOfArg for ($($name,)*) {
+            type Item<'a> = ($(Option<$name::Item<'a>>,)*);
+        }
         #[allow(non_snake_case)]
         #[allow(clippy::unused_unit)]
         // SAFETY: defers to soundness of `$name: WorldQuery` impl
-        unsafe impl<$($name: WorldQuery),*> WorldQuery for AnyOf<($($name,)*)> {
+        unsafe impl<'a, $($name: WorldQuery),*> WorldQuery for AnyOf<'a, ($($name,)*)> {
             type Fetch<'w> = ($(($name::Fetch<'w>, bool),)*);
-            type Item<'w> = ($(Option<$name::Item<'w>>,)*);
-            type ReadOnly = AnyOf<($($name::ReadOnly,)*)>;
+            type Item<'w> = AnyOf<'w, ($($name,)*)>;
+            type ReadOnly = AnyOf<'a, ($($name::ReadOnly,)*)>;
             type State = ($($name::State,)*);
 
             fn shrink<'wlong: 'wshort, 'wshort>(item: Self::Item<'wlong>) -> Self::Item<'wshort> {
-                let ($($name,)*) = item;
-                ($(
+                let ($($name,)*) = item.0;
+                AnyOf(($(
                     $name.map($name::shrink),
-                )*)
+                )*))
             }
 
             #[allow(clippy::unused_unit)]
@@ -1501,9 +1512,9 @@ macro_rules! impl_anytuple_fetch {
                 _table_row: TableRow
             ) -> Self::Item<'w> {
                 let ($($name,)*) = _fetch;
-                ($(
+                AnyOf(($(
                     $name.1.then(|| $name::fetch(&mut $name.0, _entity, _table_row)),
-                )*)
+                )*))
             }
 
             fn update_component_access(state: &Self::State, _access: &mut FilteredAccess<ComponentId>) {
@@ -1559,7 +1570,7 @@ macro_rules! impl_anytuple_fetch {
         }
 
         /// SAFETY: each item in the tuple is read only
-        unsafe impl<$($name: ReadOnlyWorldQuery),*> ReadOnlyWorldQuery for AnyOf<($($name,)*)> {}
+        unsafe impl<'a, $($name: ReadOnlyWorldQuery),*> ReadOnlyWorldQuery for AnyOf<'a, ($($name,)*)> {}
 
     };
 }
