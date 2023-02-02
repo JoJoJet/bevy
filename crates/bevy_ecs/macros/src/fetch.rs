@@ -3,9 +3,7 @@ use proc_macro2::{Ident, Span};
 use quote::{quote, ToTokens};
 use syn::{
     parse::{Parse, ParseStream},
-    parse_quote,
-    punctuated::Punctuated,
-    Attribute, Data, DataStruct, DeriveInput, Field, Fields,
+    parse_quote, Attribute, Data, DataStruct, DeriveInput, Field, Fields,
 };
 
 use crate::bevy_ecs_path;
@@ -13,11 +11,9 @@ use crate::bevy_ecs_path;
 #[derive(Default)]
 struct FetchStructAttributes {
     pub is_mutable: bool,
-    pub derive_args: Punctuated<syn::NestedMeta, syn::token::Comma>,
 }
 
 static MUTABLE_ATTRIBUTE_NAME: &str = "mutable";
-static DERIVE_ATTRIBUTE_NAME: &str = "derive";
 
 mod field_attr_keywords {
     syn::custom_keyword!(ignore);
@@ -53,16 +49,6 @@ pub fn derive_world_query_impl(ast: DeriveInput) -> TokenStream {
                     } else {
                         panic!(
                             "The `{MUTABLE_ATTRIBUTE_NAME}` attribute is expected to have no value or arguments",
-                        );
-                    }
-                } else if ident == DERIVE_ATTRIBUTE_NAME {
-                    if let syn::Meta::List(meta_list) = meta {
-                        fetch_struct_attributes
-                            .derive_args
-                            .extend(meta_list.nested.iter().cloned());
-                    } else {
-                        panic!(
-                            "Expected a structured list within the `{DERIVE_ATTRIBUTE_NAME}` attribute",
                         );
                     }
                 } else {
