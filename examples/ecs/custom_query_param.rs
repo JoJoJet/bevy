@@ -36,16 +36,15 @@ struct ComponentD;
 #[derive(Component, Debug)]
 struct ComponentZ;
 
-#[derive(WorldQuery)]
-#[world_query(derive(Debug))]
-struct ReadOnlyCustomQuery<T: Component + Debug, P: Component + Debug> {
+#[derive(WorldQuery, Debug)]
+struct ReadOnlyCustomQuery<'a, T: Component + Debug, P: Component + Debug> {
     entity: Entity,
-    a: &'static ComponentA,
-    b: Option<&'static ComponentB>,
-    nested: NestedQuery,
-    optional_nested: Option<NestedQuery>,
-    optional_tuple: Option<(&'static ComponentB, &'static ComponentZ)>,
-    generic: GenericQuery<T, P>,
+    a: &'a ComponentA,
+    b: Option<&'a ComponentB>,
+    nested: NestedQuery<'a>,
+    optional_nested: Option<NestedQuery<'a>>,
+    optional_tuple: Option<(&'a ComponentB, &'a ComponentZ)>,
+    generic: GenericQuery<'a, T, P>,
     empty: EmptyQuery,
 }
 
@@ -71,36 +70,33 @@ fn print_components_read_only(
 // Note: if you want to use derive macros with read-only query variants, you need to pass them with
 // using the `derive` attribute.
 #[derive(WorldQuery)]
-#[world_query(mutable, derive(Debug))]
-struct CustomQuery<T: Component + Debug, P: Component + Debug> {
+#[world_query(mutable)]
+struct CustomQuery<'a, T: Component + Debug, P: Component + Debug> {
     entity: Entity,
-    a: &'static mut ComponentA,
-    b: Option<&'static mut ComponentB>,
-    nested: NestedQuery,
-    optional_nested: Option<NestedQuery>,
-    optional_tuple: Option<(NestedQuery, &'static mut ComponentZ)>,
-    generic: GenericQuery<T, P>,
+    a: Mut<'a, ComponentA>,
+    b: Option<Mut<'a, ComponentB>>,
+    nested: NestedQuery<'a>,
+    optional_nested: Option<NestedQuery<'a>>,
+    optional_tuple: Option<(NestedQuery<'a>, Mut<'a, ComponentZ>)>,
+    generic: GenericQuery<'a, T, P>,
     empty: EmptyQuery,
 }
 
 // This is a valid query as well, which would iterate over every entity.
-#[derive(WorldQuery)]
-#[world_query(derive(Debug))]
+#[derive(WorldQuery, Debug)]
 struct EmptyQuery {
     empty: (),
 }
 
-#[derive(WorldQuery)]
-#[world_query(derive(Debug))]
-struct NestedQuery {
-    c: &'static ComponentC,
-    d: Option<&'static ComponentD>,
+#[derive(WorldQuery, Debug)]
+struct NestedQuery<'a> {
+    c: &'a ComponentC,
+    d: Option<&'a ComponentD>,
 }
 
-#[derive(WorldQuery)]
-#[world_query(derive(Debug))]
-struct GenericQuery<T: Component, P: Component> {
-    generic: (&'static T, &'static P),
+#[derive(WorldQuery, Debug)]
+struct GenericQuery<'a, T: Component, P: Component> {
+    generic: (&'a T, &'a P),
 }
 
 #[derive(WorldQuery)]
@@ -120,8 +116,6 @@ fn print_components_iter_mut(
 ) {
     println!("Print components (iter_mut):");
     for e in &mut query {
-        // Re-declaring the variable to illustrate the type of the actual iterator item.
-        let e: CustomQueryItem<'_, _, _> = e;
         println!("Entity: {:?}", e.entity);
         println!("A: {:?}", e.a);
         println!("B: {:?}", e.b);
@@ -139,7 +133,7 @@ fn print_components_iter(
     println!("Print components (iter):");
     for e in &query {
         // Re-declaring the variable to illustrate the type of the actual iterator item.
-        let e: CustomQueryReadOnlyItem<'_, _, _> = e;
+        let e: CustomQueryReadOnly<'_, _, _> = e;
         println!("Entity: {:?}", e.entity);
         println!("A: {:?}", e.a);
         println!("B: {:?}", e.b);
