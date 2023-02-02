@@ -257,12 +257,20 @@ unsafe impl<T: Component> ReadOnlyWorldQuery for Without<T> {}
 /// ```
 pub struct Or<T: ?Sized>(pub <T as OrArg>::Bool);
 
+impl<T: ?Sized> Clone for Or<T> {
+    fn clone(&self) -> Self {
+        *self
+    }
+}
+
+impl<T: ?Sized> Copy for Or<T> {}
+
 /// This is used as a workaround that allows [`Or`] to have a single boolean field,
 /// without needing [`PhantomData`] for the type arguments.
 /// This trait is implemented for all types.
 #[doc(hidden)]
 pub trait OrArg {
-    type Bool;
+    type Bool: 'static;
 }
 
 impl<T: ?Sized> OrArg for T {
