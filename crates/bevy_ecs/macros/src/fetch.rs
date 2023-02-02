@@ -82,6 +82,14 @@ pub fn derive_world_query_impl(ast: DeriveInput) -> TokenStream {
         .filter(|g| !matches!(g, syn::GenericParam::Lifetime(_)))
         .cloned()
         .collect();
+    let lifetimeless_user_generic_idents: Vec<_> = lifetimeless_user_generics
+        .iter()
+        .map(|g| match g {
+            syn::GenericParam::Type(g) => g.ident.clone(),
+            syn::GenericParam::Const(g) => g.ident.clone(),
+            syn::GenericParam::Lifetime(_) => unreachable!(),
+        })
+        .collect();
 
     let struct_name = ast.ident.clone();
     let read_only_struct_name = if fetch_struct_attributes.is_mutable {
@@ -181,7 +189,7 @@ pub fn derive_world_query_impl(ast: DeriveInput) -> TokenStream {
             unsafe impl #user_impl_generics #path::query::WorldQuery
                 for #struct_name #user_ty_generics #user_where_clauses {
 
-                type Item<'__w> = #struct_name <#(#replaced_lifetimes,)* #(#lifetimeless_user_generics,)*>;
+                type Item<'__w> = #struct_name <#(#replaced_lifetimes,)* #(#lifetimeless_user_generic_idents,)*>;
                 type Fetch<'__w> = #fetch_struct_name #user_ty_generics_with_world;
                 type ReadOnly = #read_only_struct_name #user_ty_generics;
                 type State = #state_struct_name #user_ty_generics;
