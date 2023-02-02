@@ -255,7 +255,7 @@ unsafe impl<T: Component> ReadOnlyWorldQuery for Without<T> {}
 /// }
 /// # bevy_ecs::system::assert_is_system(print_cool_entity_system);
 /// ```
-pub struct Or<T>(pub T);
+pub struct Or<T>(pub bool, PhantomData<T>);
 
 #[doc(hidden)]
 pub struct OrFetch<'w, T: WorldQuery> {
@@ -271,12 +271,12 @@ macro_rules! impl_query_filter_tuple {
         // SAFETY: defers to soundness of `$filter: WorldQuery` impl
         unsafe impl<$($filter: WorldQuery),*> WorldQuery for Or<($($filter,)*)> {
             type Fetch<'w> = ($(OrFetch<'w, $filter>,)*);
-            type Item<'w> = bool;
+            type Item<'w> = Or<($($filter::Item<'w>,)*)>;
             type ReadOnly = Or<($($filter::ReadOnly,)*)>;
             type State = ($($filter::State,)*);
 
-            fn shrink<'wlong: 'wshort, 'wshort>(item: Self::Item<'wlong>) -> Self::Item<'wshort> {
-                item
+            fn shrink<'wlong: 'wshort, 'wshort>(Or(val, ..): Self::Item<'wlong>) -> Self::Item<'wshort> {
+                Or(val, PhantomData)
             }
 
             const IS_DENSE: bool = true $(&& $filter::IS_DENSE)*;
@@ -335,20 +335,20 @@ macro_rules! impl_query_filter_tuple {
             #[inline(always)]
             unsafe fn fetch<'w>(
                 fetch: &mut Self::Fetch<'w>,
-                _entity: Entity,
-                _table_row: TableRow
+                entity: Entity,
+                table_row: TableRow
             ) -> Self::Item<'w> {
-                let ($($filter,)*) = fetch;
-                false $(|| ($filter.matches && $filter::filter_fetch(&mut $filter.fetch, _entity, _table_row)))*
+                Or(Self::filter_fetch(fetch, entity, table_row), PhantomData)
             }
 
             #[inline(always)]
             unsafe fn filter_fetch<'w>(
                 fetch: &mut Self::Fetch<'w>,
-                entity: Entity,
-                table_row: TableRow
+                _entity: Entity,
+                _table_row: TableRow
             ) -> bool {
-                Self::fetch(fetch, entity, table_row)
+                let ($($filter,)*) = fetch;
+                false $(|| ($filter.matches && $filter::filter_fetch(&mut $filter.fetch, _entity, _table_row)))*
             }
 
             fn update_component_access(state: &Self::State, access: &mut FilteredAccess<ComponentId>) {
