@@ -255,7 +255,19 @@ unsafe impl<T: Component> ReadOnlyWorldQuery for Without<T> {}
 /// }
 /// # bevy_ecs::system::assert_is_system(print_cool_entity_system);
 /// ```
-pub struct Or<T>(pub bool, PhantomData<T>);
+pub struct Or<T: ?Sized>(pub <T as OrArg>::Bool);
+
+/// This is used as a workaround that allows [`Or`] to have a single boolean field,
+/// without needing [`PhantomData`] for the type arguments.
+/// This trait is implemented for all types.
+#[doc(hidden)]
+pub trait OrArg {
+    type Bool;
+}
+
+impl<T: ?Sized> OrArg for T {
+    type Bool = bool;
+}
 
 #[doc(hidden)]
 pub struct OrFetch<'w, T: WorldQuery> {
@@ -275,8 +287,8 @@ macro_rules! impl_query_filter_tuple {
             type ReadOnly = Or<($($filter::ReadOnly,)*)>;
             type State = ($($filter::State,)*);
 
-            fn shrink<'wlong: 'wshort, 'wshort>(Or(val, ..): Self::Item<'wlong>) -> Self::Item<'wshort> {
-                Or(val, PhantomData)
+            fn shrink<'wlong: 'wshort, 'wshort>(Or(val): Self::Item<'wlong>) -> Self::Item<'wshort> {
+                Or(val)
             }
 
             const IS_DENSE: bool = true $(&& $filter::IS_DENSE)*;
@@ -338,7 +350,7 @@ macro_rules! impl_query_filter_tuple {
                 entity: Entity,
                 table_row: TableRow
             ) -> Self::Item<'w> {
-                Or(Self::filter_fetch(fetch, entity, table_row), PhantomData)
+                Or(Self::filter_fetch(fetch, entity, table_row))
             }
 
             #[inline(always)]
