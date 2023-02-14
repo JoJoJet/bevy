@@ -41,8 +41,7 @@ use super::{prototype::SystemPrototype, CombinatorPrototype, Combine};
 ///     result.ok().filter(|&n| n < 100)
 /// }
 /// ```
-pub type PipeSystem<SystemA, SystemB, MarkerA, MarkerB> =
-    CombinatorPrototype<Pipe, SystemA, SystemB, MarkerA, MarkerB>;
+pub type PipeSystem<SystemA, SystemB> = CombinatorPrototype<Pipe, SystemA, SystemB>;
 
 #[doc(hidden)]
 pub struct Pipe;
@@ -70,7 +69,7 @@ where
     SystemB: SystemPrototype<ParamB, In = Self::Out>,
 {
     /// Pass the output of this system `A` into a second system `B`, creating a new compound system.
-    fn pipe(self, system: SystemB) -> PipeSystem<Self, SystemB, ParamA, ParamB>;
+    fn pipe(self, system: SystemB) -> PipeSystem<Self, SystemB>;
 }
 
 impl<SystemA, ParamA, SystemB, ParamB> IntoPipeSystem<ParamA, SystemB, ParamB> for SystemA
@@ -78,7 +77,7 @@ where
     SystemA: SystemPrototype<ParamA>,
     SystemB: SystemPrototype<ParamB, In = SystemA::Out>,
 {
-    fn pipe(self, system: SystemB) -> PipeSystem<SystemA, SystemB, ParamA, ParamB> {
+    fn pipe(self, system: SystemB) -> PipeSystem<SystemA, SystemB> {
         PipeSystem::new(self, system)
     }
 }

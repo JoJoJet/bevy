@@ -51,7 +51,7 @@ pub trait Condition<Marker>: sealed::Condition<Marker> {
     /// Note that in this case, it's better to just use the run condition [`resource_exists_and_equals`].
     ///
     /// [`resource_exists_and_equals`]: common_conditions::resource_exists_and_equals
-    fn and_then<P, C: Condition<P>>(self, and_then: C) -> AndThen<Self, C, Marker, P> {
+    fn and_then<P, C: Condition<P>>(self, and_then: C) -> AndThen<Self, C> {
         AndThen::new(self, and_then)
     }
 
@@ -95,7 +95,7 @@ pub trait Condition<Marker>: sealed::Condition<Marker> {
     /// # app.run(&mut world);
     /// # assert!(world.resource::<C>().0);
     /// ```
-    fn or_else<P, C: Condition<P>>(self, or_else: C) -> OrElse<Self, C, Marker, P> {
+    fn or_else<P, C: Condition<P>>(self, or_else: C) -> OrElse<Self, C> {
         OrElse::new(self, or_else)
     }
 }
@@ -282,11 +282,10 @@ pub mod common_conditions {
 }
 
 /// Combines the outputs of two systems using the `&&` operator.
-pub type AndThen<A, B, MarkerA, MarkerB> =
-    CombinatorPrototype<AndThenMarker, A, B, MarkerA, MarkerB>;
+pub type AndThen<A, B> = CombinatorPrototype<AndThenMarker, A, B>;
 
 /// Combines the outputs of two systems using the `||` operator.
-pub type OrElse<A, B, MarkerA, MarkerB> = CombinatorPrototype<OrElseMarker, A, B, MarkerA, MarkerB>;
+pub type OrElse<A, B> = CombinatorPrototype<OrElseMarker, A, B>;
 
 #[doc(hidden)]
 pub struct AndThenMarker;

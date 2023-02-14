@@ -19,7 +19,7 @@ use crate::system::System;
 ///
 /// // A system combinator that performs an exclusive-or (XOR)
 /// // operation on the output of two systems.
-/// pub type Xor<A, B, MarkerA, MarkerB> = CombinatorPrototype<XorMarker, A, B, MarkerA, MarkerB>;
+/// pub type Xor<A, B> = CombinatorPrototype<XorMarker, A, B>;
 ///
 /// // This struct is used to customize the behavior of our combinator.
 /// pub struct XorMarker;
@@ -92,13 +92,13 @@ pub trait Combine<AIn, AOut, BIn, BOut>: 'static {
     ) -> Self::Out;
 }
 
-pub struct CombinatorPrototype<Func, A, B, MarkerA, MarkerB> {
-    _marker: PhantomData<fn() -> (Func, MarkerA, MarkerB)>,
+pub struct CombinatorPrototype<Func, A, B> {
+    _marker: PhantomData<fn() -> Func>,
     a: A,
     b: B,
 }
 
-impl<Func, A, B, MarkerA, MarkerB> CombinatorPrototype<Func, A, B, MarkerA, MarkerB> {
+impl<Func, A, B> CombinatorPrototype<Func, A, B> {
     pub const fn new(a: A, b: B) -> Self {
         Self {
             _marker: PhantomData,
@@ -111,7 +111,7 @@ impl<Func, A, B, MarkerA, MarkerB> CombinatorPrototype<Func, A, B, MarkerA, Mark
 pub struct IsCombinator;
 
 impl<A, B, MarkerA, MarkerB, Func> SystemPrototype<(IsCombinator, Func, MarkerA, MarkerB)>
-    for CombinatorPrototype<Func, A, B, MarkerA, MarkerB>
+    for CombinatorPrototype<Func, A, B>
 where
     MarkerA: 'static,
     MarkerB: 'static,
