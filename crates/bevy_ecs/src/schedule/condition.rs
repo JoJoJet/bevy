@@ -1,6 +1,7 @@
-use std::borrow::Cow;
+use std::marker::PhantomData;
 
-use crate::system::{BoxedSystem, CombinatorSystem, Combine, IntoSystem, System};
+use crate::system::{BoxedSystem, CombinatorPrototype, Combine, SystemPrototype};
+use crate::world::World;
 
 pub type BoxedCondition = BoxedSystem<(), bool>;
 
@@ -53,11 +54,8 @@ pub trait Condition<Params>: sealed::Condition<Params> {
     /// Note that in this case, it's better to just use the run condition [`resource_exists_and_equals`].
     ///
     /// [`resource_exists_and_equals`]: common_conditions::resource_exists_and_equals
-    fn and_then<P, C: Condition<P>>(self, and_then: C) -> AndThen<Self::System, C::System> {
-        let a = IntoSystem::into_system(self);
-        let b = IntoSystem::into_system(and_then);
-        let name = format!("{} && {}", a.name(), b.name());
-        CombinatorSystem::new(a, b, Cow::Owned(name))
+    fn and_then<P, C: Condition<P>>(self, and_then: C) -> AndThen<Self, C, Params, P> {
+        AndThen::new(self, and_then)
     }
 
     /// Returns a new run condition that returns `true`
@@ -100,34 +98,33 @@ pub trait Condition<Params>: sealed::Condition<Params> {
     /// # app.run(&mut world);
     /// # assert!(world.resource::<C>().0);
     /// ```
-    fn or_else<P, C: Condition<P>>(self, or_else: C) -> OrElse<Self::System, C::System> {
-        let a = IntoSystem::into_system(self);
-        let b = IntoSystem::into_system(or_else);
-        let name = format!("{} || {}", a.name(), b.name());
-        CombinatorSystem::new(a, b, Cow::Owned(name))
+    fn or_else<P, C: Condition<P>>(self, or_else: C) -> OrElse<Self, C, Params, P> {
+        OrElse::new(self, or_else)
     }
 }
 
 impl<Params, F> Condition<Params> for F where F: sealed::Condition<Params> {}
 
 mod sealed {
-    use crate::system::{IntoSystem, ReadOnlySystem};
+    use crate::system::{ReadOnlySystemParam, SystemPrototype};
 
-    pub trait Condition<Params>: IntoSystem<(), bool, Params> {}
+    pub trait Condition<Params>: SystemPrototype<Params, In = (), Out = bool> {}
 
     impl<Params, F> Condition<Params> for F
     where
-        F: IntoSystem<(), bool, Params>,
-        F::System: ReadOnlySystem,
+        F: SystemPrototype<Params, In = (), Out = bool>,
+        F::Param: ReadOnlySystemParam,
     {
     }
 }
 
 pub mod common_conditions {
+    use std::marker::PhantomData;
+
     use super::Condition;
     use crate::{
         schedule::{State, States},
-        system::{In, IntoPipeSystem, ReadOnlySystem, Res, Resource},
+        system::{ReadOnlySystemParam, Res, Resource},
     };
 
     /// Generates a [`Condition`](super::Condition)-satisfying closure that returns `true`
@@ -233,38 +230,42 @@ pub mod common_conditions {
     /// #
     /// # fn my_system() { unreachable!() }
     /// ```
-    pub fn not<Params, C: Condition<Params>>(
+    pub fn not<Params: 'static, C: Condition<Params>>(
         condition: C,
-    ) -> impl ReadOnlySystem<In = (), Out = bool>
+    ) -> impl Condition<(super::NotMarker, Params)>
     where
-        C::System: ReadOnlySystem,
+        C::Param: ReadOnlySystemParam,
     {
-        condition.pipe(|In(val): In<bool>| !val)
+        super::Not {
+            inner: condition,
+            _marker: PhantomData,
+        }
     }
 }
 
 /// Combines the outputs of two systems using the `&&` operator.
-pub type AndThen<A, B> = CombinatorSystem<AndThenMarker, A, B>;
+pub type AndThen<A, B, MarkerA, MarkerB> =
+    CombinatorPrototype<AndThenMarker, A, B, MarkerA, MarkerB>;
 
 /// Combines the outputs of two systems using the `||` operator.
-pub type OrElse<A, B> = CombinatorSystem<OrElseMarker, A, B>;
+pub type OrElse<A, B, MarkerA, MarkerB> = CombinatorPrototype<OrElseMarker, A, B, MarkerA, MarkerB>;
 
 #[doc(hidden)]
 pub struct AndThenMarker;
 
-impl<In, A, B> Combine<A, B> for AndThenMarker
+impl<In, A, B, MarkerA, MarkerB> Combine<A, B, MarkerA, MarkerB> for AndThenMarker
 where
     In: Copy,
-    A: System<In = In, Out = bool>,
-    B: System<In = In, Out = bool>,
+    A: SystemPrototype<MarkerA, In = In, Out = bool>,
+    B: SystemPrototype<MarkerB, In = In, Out = bool>,
 {
     type In = In;
     type Out = bool;
 
     fn combine(
         input: Self::In,
-        a: impl FnOnce(<A as System>::In) -> <A as System>::Out,
-        b: impl FnOnce(<B as System>::In) -> <B as System>::Out,
+        a: impl FnOnce(A::In) -> A::Out,
+        b: impl FnOnce(B::In) -> B::Out,
     ) -> Self::Out {
         a(input) && b(input)
     }
@@ -273,20 +274,63 @@ where
 #[doc(hidden)]
 pub struct OrElseMarker;
 
-impl<In, A, B> Combine<A, B> for OrElseMarker
+impl<In, A, B, MarkerA, MarkerB> Combine<A, B, MarkerA, MarkerB> for OrElseMarker
 where
     In: Copy,
-    A: System<In = In, Out = bool>,
-    B: System<In = In, Out = bool>,
+    A: SystemPrototype<MarkerA, In = In, Out = bool>,
+    B: SystemPrototype<MarkerB, In = In, Out = bool>,
 {
     type In = In;
     type Out = bool;
 
     fn combine(
         input: Self::In,
-        a: impl FnOnce(<A as System>::In) -> <A as System>::Out,
-        b: impl FnOnce(<B as System>::In) -> <B as System>::Out,
+        a: impl FnOnce(A::In) -> A::Out,
+        b: impl FnOnce(B::In) -> B::Out,
     ) -> Self::Out {
         a(input) || b(input)
+    }
+}
+
+pub struct Not<Marker, T>
+where
+    T: SystemPrototype<Marker>,
+{
+    inner: T,
+    _marker: PhantomData<fn() -> Marker>,
+}
+
+pub struct NotMarker;
+
+impl<Marker, T> SystemPrototype<(NotMarker, Marker)> for Not<Marker, T>
+where
+    Marker: 'static,
+    T: SystemPrototype<Marker>,
+    T::Out: std::ops::Not,
+{
+    const IS_EXCLUSIVE: bool = T::IS_EXCLUSIVE;
+
+    type In = T::In;
+    type Out = <T::Out as std::ops::Not>::Output;
+
+    type Param = T::Param;
+    type State = T::State;
+
+    fn run_parallel(
+        &mut self,
+        input: Self::In,
+        param: crate::system::SystemParamItem<Self::Param>,
+    ) -> Self::Out {
+        !self.inner.run_parallel(input, param)
+    }
+
+    fn run_exclusive(
+        &mut self,
+        input: Self::In,
+        world: &mut World,
+        state: &mut Self::State,
+        system_meta: &crate::system::SystemMeta,
+    ) -> Self::Out {
+        !self.inner.run_exclusive(input, world, state, system_meta)
     }
 }

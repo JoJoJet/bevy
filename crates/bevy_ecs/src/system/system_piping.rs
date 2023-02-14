@@ -1,7 +1,4 @@
-use crate::system::{IntoSystem, System};
-use std::borrow::Cow;
-
-use super::{CombinatorSystem, Combine};
+use super::{prototype::SystemPrototype, CombinatorPrototype, Combine};
 
 /// A [`System`] created by piping the output of the first system into the input of the second.
 ///
@@ -42,23 +39,24 @@ use super::{CombinatorSystem, Combine};
 ///     result.ok().filter(|&n| n < 100)
 /// }
 /// ```
-pub type PipeSystem<SystemA, SystemB> = CombinatorSystem<Pipe, SystemA, SystemB>;
+pub type PipeSystem<SystemA, SystemB, MarkerA, MarkerB> =
+    CombinatorPrototype<Pipe, SystemA, SystemB, MarkerA, MarkerB>;
 
 #[doc(hidden)]
 pub struct Pipe;
 
-impl<A, B> Combine<A, B> for Pipe
+impl<A, B, MarkerA, MarkerB> Combine<A, B, MarkerA, MarkerB> for Pipe
 where
-    A: System,
-    B: System<In = A::Out>,
+    A: SystemPrototype<MarkerA>,
+    B: SystemPrototype<MarkerB, In = A::Out>,
 {
     type In = A::In;
     type Out = B::Out;
 
     fn combine(
         input: Self::In,
-        a: impl FnOnce(<A as System>::In) -> <A as System>::Out,
-        b: impl FnOnce(<B as System>::In) -> <B as System>::Out,
+        a: impl FnOnce(A::In) -> A::Out,
+        b: impl FnOnce(B::In) -> B::Out,
     ) -> Self::Out {
         let value = a(input);
         b(value)
@@ -73,26 +71,21 @@ where
 /// This trait is blanket implemented for all system pairs that fulfill the type requirements.
 ///
 /// See [`PipeSystem`].
-pub trait IntoPipeSystem<ParamA, Payload, SystemB, ParamB, Out>:
-    IntoSystem<(), Payload, ParamA> + Sized
+pub trait IntoPipeSystem<ParamA, SystemB, ParamB>: SystemPrototype<ParamA> + Sized
 where
-    SystemB: IntoSystem<Payload, Out, ParamB>,
+    SystemB: SystemPrototype<ParamB, In = Self::Out>,
 {
     /// Pass the output of this system `A` into a second system `B`, creating a new compound system.
-    fn pipe(self, system: SystemB) -> PipeSystem<Self::System, SystemB::System>;
+    fn pipe(self, system: SystemB) -> PipeSystem<Self, SystemB, ParamA, ParamB>;
 }
 
-impl<SystemA, ParamA, Payload, SystemB, ParamB, Out>
-    IntoPipeSystem<ParamA, Payload, SystemB, ParamB, Out> for SystemA
+impl<SystemA, ParamA, SystemB, ParamB> IntoPipeSystem<ParamA, SystemB, ParamB> for SystemA
 where
-    SystemA: IntoSystem<(), Payload, ParamA>,
-    SystemB: IntoSystem<Payload, Out, ParamB>,
+    SystemA: SystemPrototype<ParamA>,
+    SystemB: SystemPrototype<ParamB, In = SystemA::Out>,
 {
-    fn pipe(self, system: SystemB) -> PipeSystem<SystemA::System, SystemB::System> {
-        let system_a = IntoSystem::into_system(self);
-        let system_b = IntoSystem::into_system(system);
-        let name = format!("Pipe({}, {})", system_a.name(), system_b.name());
-        PipeSystem::new(system_a, system_b, Cow::Owned(name))
+    fn pipe(self, system: SystemB) -> PipeSystem<SystemA, SystemB, ParamA, ParamB> {
+        PipeSystem::new(self, system)
     }
 }
 

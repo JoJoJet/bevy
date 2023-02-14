@@ -1,12 +1,10 @@
-use std::{borrow::Cow, cell::UnsafeCell, marker::PhantomData};
+use std::{cell::UnsafeCell, marker::PhantomData};
 
 use bevy_ptr::UnsafeCellDeref;
 
-use crate::{
-    archetype::ArchetypeComponentId, component::ComponentId, prelude::World, query::Access,
-};
+use crate::prelude::World;
 
-use super::{ReadOnlySystem, System};
+use super::{prototype::SystemPrototype, ParamSet, SystemParam, SystemParamItem};
 
 /// Customizes the behavior of a [`CombinatorSystem`].
 ///
@@ -78,7 +76,11 @@ use super::{ReadOnlySystem, System};
 /// # assert!(world.resource::<RanFlag>().0);
 /// # world.resource_mut::<RanFlag>().0 = false;
 /// ```
-pub trait Combine<A: System, B: System> {
+pub trait Combine<A, B, MarkerA, MarkerB>: 'static
+where
+    A: SystemPrototype<MarkerA>,
+    B: SystemPrototype<MarkerB>,
+{
     /// The [input](System::In) type for a [`CombinatorSystem`].
     type In;
 
@@ -96,133 +98,91 @@ pub trait Combine<A: System, B: System> {
     ) -> Self::Out;
 }
 
-/// A [`System`] defined by combining two other systems.
-/// The behavior of this combinator is specified by implementing the [`Combine`] trait.
-/// For a full usage example, see the docs for [`Combine`].
-pub struct CombinatorSystem<Func, A, B> {
-    _marker: PhantomData<fn() -> Func>,
+pub struct CombinatorPrototype<Func, A, B, MarkerA, MarkerB> {
+    _marker: PhantomData<fn() -> (Func, MarkerA, MarkerB)>,
     a: A,
     b: B,
-    name: Cow<'static, str>,
-    component_access: Access<ComponentId>,
-    archetype_component_access: Access<ArchetypeComponentId>,
 }
 
-impl<Func, A, B> CombinatorSystem<Func, A, B> {
-    pub const fn new(a: A, b: B, name: Cow<'static, str>) -> Self {
+impl<Func, A, B, MarkerA, MarkerB> CombinatorPrototype<Func, A, B, MarkerA, MarkerB> {
+    pub const fn new(a: A, b: B) -> Self {
         Self {
             _marker: PhantomData,
             a,
             b,
-            name,
-            component_access: Access::new(),
-            archetype_component_access: Access::new(),
         }
     }
 }
 
-impl<A, B, Func> System for CombinatorSystem<Func, A, B>
+pub struct IsCombinator;
+
+impl<A, B, MarkerA, MarkerB, Func> SystemPrototype<(IsCombinator, Func, MarkerA, MarkerB)>
+    for CombinatorPrototype<Func, A, B, MarkerA, MarkerB>
 where
-    Func: Combine<A, B> + 'static,
-    A: System,
-    B: System,
+    MarkerA: 'static,
+    MarkerB: 'static,
+    A: SystemPrototype<MarkerA>,
+    B: SystemPrototype<MarkerB>,
+    Func: Combine<A, B, MarkerA, MarkerB>,
 {
+    const IS_EXCLUSIVE: bool = A::IS_EXCLUSIVE || B::IS_EXCLUSIVE;
+
     type In = Func::In;
     type Out = Func::Out;
 
-    fn name(&self) -> Cow<'static, str> {
-        self.name.clone()
-    }
+    type Param = ParamSet<'static, 'static, (A::Param, B::Param)>;
+    type State = <Self::Param as SystemParam>::State;
 
-    fn type_id(&self) -> std::any::TypeId {
-        std::any::TypeId::of::<Self>()
-    }
-
-    fn component_access(&self) -> &Access<ComponentId> {
-        &self.component_access
-    }
-
-    fn archetype_component_access(&self) -> &Access<ArchetypeComponentId> {
-        &self.archetype_component_access
-    }
-
-    fn is_send(&self) -> bool {
-        self.a.is_send() && self.b.is_send()
-    }
-
-    fn is_exclusive(&self) -> bool {
-        self.a.is_exclusive() || self.b.is_exclusive()
-    }
-
-    unsafe fn run_unsafe(&mut self, input: Self::In, world: &World) -> Self::Out {
-        Func::combine(
-            input,
-            // SAFETY: The world accesses for both underlying systems have been registered,
-            // so the caller will guarantee that no other systems will conflict with `a` or `b`.
-            // Since these closures are `!Send + !Synd + !'static`, they can never be called
-            // in parallel, so their world accesses will not conflict with each other.
-            |input| self.a.run_unsafe(input, world),
-            |input| self.b.run_unsafe(input, world),
-        )
-    }
-
-    fn run<'w>(&mut self, input: Self::In, world: &'w mut World) -> Self::Out {
+    fn run_parallel(
+        &mut self,
+        input: Self::In,
+        mut param: SystemParamItem<Self::Param>,
+    ) -> Self::Out {
         // SAFETY: Converting `&mut T` -> `&UnsafeCell<T>`
         // is explicitly allowed in the docs for `UnsafeCell`.
-        let world: &'w UnsafeCell<World> = unsafe { std::mem::transmute(world) };
+        let param: &UnsafeCell<SystemParamItem<Self::Param>> =
+            unsafe { std::mem::transmute(&mut param) };
         Func::combine(
             input,
             // SAFETY: Since these closures are `!Send + !Synd + !'static`, they can never
             // be called in parallel. Since mutable access to `world` only exists within
             // the scope of either closure, we can be sure they will never alias one another.
-            |input| self.a.run(input, unsafe { world.deref_mut() }),
+            |input| {
+                self.a
+                    .run_parallel(input, unsafe { param.deref_mut().p0() })
+            },
             #[allow(clippy::undocumented_unsafe_blocks)]
-            |input| self.b.run(input, unsafe { world.deref_mut() }),
+            |input| {
+                self.b
+                    .run_parallel(input, unsafe { param.deref_mut().p1() })
+            },
         )
     }
 
-    fn apply_buffers(&mut self, world: &mut World) {
-        self.a.apply_buffers(world);
-        self.b.apply_buffers(world);
+    fn run_exclusive(
+        &mut self,
+        input: Self::In,
+        world: &mut World,
+        (state_a, state_b): &mut Self::State,
+        system_meta: &super::SystemMeta,
+    ) -> Self::Out {
+        // SAFETY: Converting `&mut T` -> `&UnsafeCell<T>`
+        // is explicitly allowed in the docs for `UnsafeCell`.
+        let world: &UnsafeCell<World> = unsafe { std::mem::transmute(world) };
+        Func::combine(
+            input,
+            // SAFETY: Since these closures are `!Send + !Synd + !'static`, they can never
+            // be called in parallel. Since mutable access to `world` only exists within
+            // the scope of either closure, we can be sure they will never alias one another.
+            |input| {
+                self.a
+                    .run_exclusive(input, unsafe { world.deref_mut() }, state_a, system_meta)
+            },
+            #[allow(clippy::undocumented_unsafe_blocks)]
+            |input| {
+                self.b
+                    .run_exclusive(input, unsafe { world.deref_mut() }, state_b, system_meta)
+            },
+        )
     }
-
-    fn initialize(&mut self, world: &mut World) {
-        self.a.initialize(world);
-        self.b.initialize(world);
-        self.component_access.extend(self.a.component_access());
-        self.component_access.extend(self.b.component_access());
-    }
-
-    fn update_archetype_component_access(&mut self, world: &World) {
-        self.a.update_archetype_component_access(world);
-        self.b.update_archetype_component_access(world);
-
-        self.archetype_component_access
-            .extend(self.a.archetype_component_access());
-        self.archetype_component_access
-            .extend(self.b.archetype_component_access());
-    }
-
-    fn check_change_tick(&mut self, change_tick: u32) {
-        self.a.check_change_tick(change_tick);
-        self.b.check_change_tick(change_tick);
-    }
-
-    fn get_last_change_tick(&self) -> u32 {
-        self.a.get_last_change_tick()
-    }
-
-    fn set_last_change_tick(&mut self, last_change_tick: u32) {
-        self.a.set_last_change_tick(last_change_tick);
-        self.b.set_last_change_tick(last_change_tick);
-    }
-}
-
-/// SAFETY: Both systems are read-only, so any system created by combining them will only read from the world.
-unsafe impl<A, B, Func> ReadOnlySystem for CombinatorSystem<Func, A, B>
-where
-    Func: Combine<A, B> + 'static,
-    A: ReadOnlySystem,
-    B: ReadOnlySystem,
-{
 }
