@@ -103,6 +103,7 @@ mod commands;
 mod exclusive_function_system;
 mod exclusive_system_param;
 mod function_system;
+mod prototype;
 mod query;
 #[allow(clippy::module_inception)]
 mod system;

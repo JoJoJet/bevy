@@ -20,7 +20,7 @@ pub struct SystemMeta {
     pub(crate) archetype_component_access: Access<ArchetypeComponentId>,
     // NOTE: this must be kept private. making a SystemMeta non-send is irreversible to prevent
     // SystemParams from overriding each other
-    is_send: bool,
+    pub(crate) is_send: bool,
     pub(crate) last_change_tick: u32,
 }
 
