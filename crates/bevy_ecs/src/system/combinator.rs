@@ -82,13 +82,13 @@ where
     A: SystemPrototype<MarkerA>,
     B: SystemPrototype<MarkerB>,
 {
-    /// The [input](System::In) type for a [`CombinatorSystem`].
+    /// The [input](System::In) type for a [`CombinatorPrototype`].
     type In;
 
-    /// The [output](System::Out) type for a [`CombinatorSystem`].
+    /// The [output](System::Out) type for a [`CombinatorPrototype`].
     type Out;
 
-    /// When used in a [`CombinatorSystem`], this function customizes how
+    /// When used in a [`CombinatorPrototype`], this function customizes how
     /// the two composite systems are invoked and their outputs are combined.
     ///
     /// See the trait-level docs for [`Combine`] for an example implementation.
