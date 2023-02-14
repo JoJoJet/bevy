@@ -133,6 +133,8 @@ where
     type Param = ParamSet<'static, 'static, (A::Param, B::Param)>;
     type State = <Self::Param as SystemParam>::State;
 
+    // clippy is way too strict with the formatting it expects
+    #[allow(clippy::undocumented_unsafe_blocks)]
     fn run_parallel(
         &mut self,
         input: Self::In,
@@ -151,7 +153,6 @@ where
                 self.a
                     .run_parallel(input, unsafe { param.deref_mut().p0() })
             },
-            #[allow(clippy::undocumented_unsafe_blocks)]
             |input| {
                 self.b
                     .run_parallel(input, unsafe { param.deref_mut().p1() })
@@ -159,6 +160,7 @@ where
         )
     }
 
+    #[allow(clippy::undocumented_unsafe_blocks)]
     fn run_exclusive(
         &mut self,
         input: Self::In,
@@ -178,7 +180,6 @@ where
                 self.a
                     .run_exclusive(input, unsafe { world.deref_mut() }, state_a, system_meta)
             },
-            #[allow(clippy::undocumented_unsafe_blocks)]
             |input| {
                 self.b
                     .run_exclusive(input, unsafe { world.deref_mut() }, state_b, system_meta)
