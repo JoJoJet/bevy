@@ -185,6 +185,25 @@ where
         out
     }
 
+    fn run(&mut self, input: Self::In, world: &mut World) -> Self::Out {
+        let saved_last_tick = world.last_change_tick;
+        world.last_change_tick = self.system_meta.last_change_tick;
+
+        let out = self.prototype.run_exclusive(
+            input,
+            world,
+            self.param_state.as_mut().expect(PARAM_MESSAGE),
+            &self.system_meta,
+        );
+
+        let change_tick = world.change_tick.get_mut();
+        self.system_meta.last_change_tick = *change_tick;
+        *change_tick = change_tick.wrapping_add(1);
+        world.last_change_tick = saved_last_tick;
+
+        out
+    }
+
     fn apply_buffers(&mut self, world: &mut World) {
         let param_state = self.param_state.as_mut().expect(PARAM_MESSAGE);
         T::Param::apply(param_state, &self.system_meta, world);
