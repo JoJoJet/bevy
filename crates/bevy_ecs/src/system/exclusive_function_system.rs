@@ -4,6 +4,9 @@ use crate::{
 };
 use bevy_ecs_macros::all_tuples;
 
+#[allow(unused_imports)] // Used in docs.
+use crate::system::System;
+
 pub struct IsExclusiveFunctionSystem;
 
 /// A trait implemented for all exclusive system functions that can be used as [`System`]s.

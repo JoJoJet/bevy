@@ -6,6 +6,9 @@ use crate::prelude::World;
 
 use super::{prototype::SystemPrototype, ParamSet, SystemParam, SystemParamItem};
 
+#[allow(unused_imports)] // Used in docs.
+use crate::system::System;
+
 /// Customizes the behavior of a [`CombinatorSystem`].
 ///
 /// # Examples
