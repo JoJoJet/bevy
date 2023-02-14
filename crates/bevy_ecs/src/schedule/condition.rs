@@ -228,9 +228,11 @@ pub mod common_conditions {
     /// #
     /// # fn my_system() { unreachable!() }
     /// ```
-    pub fn not<Marker: 'static, C: Condition<Marker>>(condition: C) -> impl Condition<()>
+    pub fn not<Marker: 'static, Param>(
+        condition: impl Condition<Marker, Param = Param>,
+    ) -> impl Condition<(), Param = Param>
     where
-        C::Param: ReadOnlySystemParam,
+        Param: ReadOnlySystemParam,
     {
         struct Not<Marker, T>
         where
