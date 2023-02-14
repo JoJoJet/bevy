@@ -228,9 +228,7 @@ pub mod common_conditions {
     /// #
     /// # fn my_system() { unreachable!() }
     /// ```
-    pub fn not<Params: 'static, C: Condition<Params>>(
-        condition: C,
-    ) -> impl Condition<(NotMarker, Params)>
+    pub fn not<Params: 'static, C: Condition<Params>>(condition: C) -> impl Condition<()>
     where
         C::Param: ReadOnlySystemParam,
     {
@@ -242,7 +240,7 @@ pub mod common_conditions {
             _marker: PhantomData<fn() -> Marker>,
         }
 
-        impl<Marker, T> SystemPrototype<(NotMarker, Marker)> for Not<Marker, T>
+        impl<Marker, T> SystemPrototype<()> for Not<Marker, T>
         where
             Marker: 'static,
             T: SystemPrototype<Marker>,
@@ -279,9 +277,6 @@ pub mod common_conditions {
             _marker: PhantomData,
         }
     }
-
-    #[doc(hidden)]
-    pub struct NotMarker;
 }
 
 /// Combines the outputs of two systems using the `&&` operator.
