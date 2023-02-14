@@ -1471,6 +1471,12 @@ impl World {
     pub fn increment_change_tick(&self) -> u32 {
         self.change_tick.fetch_add(1, Ordering::AcqRel)
     }
+    #[inline]
+    pub fn increment_change_tick_mut(&mut self) -> u32 {
+        let change_tick = self.change_tick.get_mut();
+        *change_tick += 1;
+        *change_tick
+    }
 
     /// Reads the current change tick of this world.
     ///
