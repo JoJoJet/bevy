@@ -12,7 +12,7 @@ use super::{
     SystemMeta, SystemParam, SystemParamFunction, SystemParamItem,
 };
 
-pub trait SystemPrototype<Marker>: Send + Sync + 'static {
+pub trait SystemPrototype<Marker>: Sized + Send + Sync + 'static {
     const IS_EXCLUSIVE: bool;
 
     type In;
