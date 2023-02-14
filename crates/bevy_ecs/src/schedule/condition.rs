@@ -1,7 +1,4 @@
-use std::marker::PhantomData;
-
-use crate::system::{BoxedSystem, CombinatorPrototype, Combine, SystemParam, SystemPrototype};
-use crate::world::World;
+use crate::system::{BoxedSystem, CombinatorPrototype, Combine, SystemPrototype};
 
 pub type BoxedCondition = BoxedSystem<(), bool>;
 
@@ -124,7 +121,8 @@ pub mod common_conditions {
     use super::Condition;
     use crate::{
         schedule::{State, States},
-        system::{ReadOnlySystemParam, Res, Resource},
+        system::{ReadOnlySystemParam, Res, Resource, SystemParam, SystemPrototype},
+        world::World,
     };
 
     /// Generates a [`Condition`](super::Condition)-satisfying closure that returns `true`
@@ -232,15 +230,58 @@ pub mod common_conditions {
     /// ```
     pub fn not<Params: 'static, C: Condition<Params>>(
         condition: C,
-    ) -> impl Condition<(super::NotMarker, Params)>
+    ) -> impl Condition<(NotMarker, Params)>
     where
         C::Param: ReadOnlySystemParam,
     {
-        super::Not {
+        struct Not<Marker, T>
+        where
+            T: SystemPrototype<Marker>,
+        {
+            inner: T,
+            _marker: PhantomData<fn() -> Marker>,
+        }
+
+        impl<Marker, T> SystemPrototype<(NotMarker, Marker)> for Not<Marker, T>
+        where
+            Marker: 'static,
+            T: SystemPrototype<Marker>,
+            T::Out: std::ops::Not,
+        {
+            const IS_EXCLUSIVE: bool = T::IS_EXCLUSIVE;
+
+            type In = T::In;
+            type Out = <T::Out as std::ops::Not>::Output;
+
+            type Param = T::Param;
+
+            fn run_parallel(
+                &mut self,
+                input: Self::In,
+                param: crate::system::SystemParamItem<Self::Param>,
+            ) -> Self::Out {
+                !self.inner.run_parallel(input, param)
+            }
+
+            fn run_exclusive(
+                &mut self,
+                input: Self::In,
+                world: &mut World,
+                state: &mut <T::Param as SystemParam>::State,
+                system_meta: &crate::system::SystemMeta,
+            ) -> Self::Out {
+                !self.inner.run_exclusive(input, world, state, system_meta)
+            }
+        }
+
+        Not {
             inner: condition,
             _marker: PhantomData,
         }
     }
+
+    #[doc(hidden)]
+    pub struct NotMarker;
 }
 
 /// Combines the outputs of two systems using the `&&` operator.
@@ -289,47 +330,5 @@ where
         b: impl FnOnce(B::In) -> B::Out,
     ) -> Self::Out {
         a(input) || b(input)
-    }
-}
-
-pub struct Not<Marker, T>
-where
-    T: SystemPrototype<Marker>,
-{
-    inner: T,
-    _marker: PhantomData<fn() -> Marker>,
-}
-
-pub struct NotMarker;
-
-impl<Marker, T> SystemPrototype<(NotMarker, Marker)> for Not<Marker, T>
-where
-    Marker: 'static,
-    T: SystemPrototype<Marker>,
-    T::Out: std::ops::Not,
-{
-    const IS_EXCLUSIVE: bool = T::IS_EXCLUSIVE;
-
-    type In = T::In;
-    type Out = <T::Out as std::ops::Not>::Output;
-
-    type Param = T::Param;
-
-    fn run_parallel(
-        &mut self,
-        input: Self::In,
-        param: crate::system::SystemParamItem<Self::Param>,
-    ) -> Self::Out {
-        !self.inner.run_parallel(input, param)
-    }
-
-    fn run_exclusive(
-        &mut self,
-        input: Self::In,
-        world: &mut World,
-        state: &mut <T::Param as SystemParam>::State,
-        system_meta: &crate::system::SystemMeta,
-    ) -> Self::Out {
-        !self.inner.run_exclusive(input, world, state, system_meta)
     }
 }
