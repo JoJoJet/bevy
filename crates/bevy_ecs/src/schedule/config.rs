@@ -9,6 +9,9 @@ use crate::{
     system::{BoxedSystem, IntoSystem, System},
 };
 
+#[allow(unused_imports)] // Used in docs.
+use crate::schedule::Condition;
+
 /// A [`SystemSet`] with scheduling metadata.
 pub struct SystemSetConfig {
     pub(super) set: BoxedSystemSet,
