@@ -28,7 +28,6 @@ pub trait SystemPrototype<Marker>: Send + Sync + 'static {
         world: &mut World,
         state: &mut Self::State,
         system_meta: &SystemMeta,
-        change_tick: u32,
     ) -> Self::Out;
 }
 
@@ -54,8 +53,8 @@ where
         world: &mut World,
         state: &mut Self::State,
         system_meta: &SystemMeta,
-        change_tick: u32,
     ) -> Self::Out {
+        let change_tick = world.change_tick();
         // SAFETY: shut up clippy
         let params = unsafe { F::Param::get_param(state, system_meta, world, change_tick) };
         self.run(input, params)
@@ -88,7 +87,6 @@ where
         world: &mut World,
         state: &mut Self::State,
         system_meta: &SystemMeta,
-        _change_tick: u32,
     ) -> Self::Out {
         let param = F::Param::get_param(state, system_meta);
         self.run(world, input, param)
