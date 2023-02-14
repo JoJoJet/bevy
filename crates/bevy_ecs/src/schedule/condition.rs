@@ -1,4 +1,4 @@
-use crate::system::{BoxedSystem, CombinatorPrototype, Combine, SystemPrototype};
+use crate::system::{BoxedSystem, CombinatorPrototype, Combine};
 
 pub type BoxedCondition = BoxedSystem<(), bool>;
 
@@ -291,19 +291,17 @@ pub type OrElse<A, B, MarkerA, MarkerB> = CombinatorPrototype<OrElseMarker, A, B
 #[doc(hidden)]
 pub struct AndThenMarker;
 
-impl<In, A, B, MarkerA, MarkerB> Combine<A, B, MarkerA, MarkerB> for AndThenMarker
+impl<In> Combine<In, bool, In, bool> for AndThenMarker
 where
     In: Copy,
-    A: SystemPrototype<MarkerA, In = In, Out = bool>,
-    B: SystemPrototype<MarkerB, In = In, Out = bool>,
 {
     type In = In;
     type Out = bool;
 
     fn combine(
         input: Self::In,
-        a: impl FnOnce(A::In) -> A::Out,
-        b: impl FnOnce(B::In) -> B::Out,
+        a: impl FnOnce(In) -> bool,
+        b: impl FnOnce(In) -> bool,
     ) -> Self::Out {
         a(input) && b(input)
     }
@@ -312,19 +310,17 @@ where
 #[doc(hidden)]
 pub struct OrElseMarker;
 
-impl<In, A, B, MarkerA, MarkerB> Combine<A, B, MarkerA, MarkerB> for OrElseMarker
+impl<In> Combine<In, bool, In, bool> for OrElseMarker
 where
     In: Copy,
-    A: SystemPrototype<MarkerA, In = In, Out = bool>,
-    B: SystemPrototype<MarkerB, In = In, Out = bool>,
 {
     type In = In;
     type Out = bool;
 
     fn combine(
         input: Self::In,
-        a: impl FnOnce(A::In) -> A::Out,
-        b: impl FnOnce(B::In) -> B::Out,
+        a: impl FnOnce(In) -> bool,
+        b: impl FnOnce(In) -> bool,
     ) -> Self::Out {
         a(input) || b(input)
     }

@@ -24,18 +24,15 @@ use crate::system::System;
 /// // This struct is used to customize the behavior of our combinator.
 /// pub struct XorMarker;
 ///
-/// impl<A, B, MarkerA, MarkerB> Combine<A, B, MarkerA, MarkerB> for XorMarker
-/// where
-///     A: SystemPrototype<MarkerA, In = (), Out = bool>,
-///     B: SystemPrototype<MarkerB, In = (), Out = bool>,
+/// impl Combine<(), bool, (), bool> for XorMarker
 /// {
 ///     type In = ();
 ///     type Out = bool;
 ///
 ///     fn combine(
 ///         _input: Self::In,
-///         a: impl FnOnce(A::In) -> A::Out,
-///         b: impl FnOnce(B::In) -> B::Out,
+///         a: impl FnOnce(()) -> bool,
+///         b: impl FnOnce(()) -> bool,
 ///     ) -> Self::Out {
 ///         a(()) ^ b(())
 ///     }
@@ -77,11 +74,7 @@ use crate::system::System;
 /// # assert!(world.resource::<RanFlag>().0);
 /// # world.resource_mut::<RanFlag>().0 = false;
 /// ```
-pub trait Combine<A, B, MarkerA, MarkerB>: 'static
-where
-    A: SystemPrototype<MarkerA>,
-    B: SystemPrototype<MarkerB>,
-{
+pub trait Combine<AIn, AOut, BIn, BOut>: 'static {
     /// The [input](System::In) type for a [`CombinatorPrototype`].
     type In;
 
@@ -94,8 +87,8 @@ where
     /// See the trait-level docs for [`Combine`] for an example implementation.
     fn combine(
         input: Self::In,
-        a: impl FnOnce(A::In) -> A::Out,
-        b: impl FnOnce(B::In) -> B::Out,
+        a: impl FnOnce(AIn) -> AOut,
+        b: impl FnOnce(BIn) -> BOut,
     ) -> Self::Out;
 }
 
@@ -124,7 +117,7 @@ where
     MarkerB: 'static,
     A: SystemPrototype<MarkerA>,
     B: SystemPrototype<MarkerB>,
-    Func: Combine<A, B, MarkerA, MarkerB>,
+    Func: Combine<A::In, A::Out, B::In, B::Out>,
 {
     const IS_EXCLUSIVE: bool = A::IS_EXCLUSIVE || B::IS_EXCLUSIVE;
 

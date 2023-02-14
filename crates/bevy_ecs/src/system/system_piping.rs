@@ -47,19 +47,11 @@ pub type PipeSystem<SystemA, SystemB, MarkerA, MarkerB> =
 #[doc(hidden)]
 pub struct Pipe;
 
-impl<A, B, MarkerA, MarkerB> Combine<A, B, MarkerA, MarkerB> for Pipe
-where
-    A: SystemPrototype<MarkerA>,
-    B: SystemPrototype<MarkerB, In = A::Out>,
-{
-    type In = A::In;
-    type Out = B::Out;
+impl<A, B, C> Combine<A, B, B, C> for Pipe {
+    type In = A;
+    type Out = C;
 
-    fn combine(
-        input: Self::In,
-        a: impl FnOnce(A::In) -> A::Out,
-        b: impl FnOnce(B::In) -> B::Out,
-    ) -> Self::Out {
+    fn combine(input: Self::In, a: impl FnOnce(A) -> B, b: impl FnOnce(B) -> C) -> Self::Out {
         let value = a(input);
         b(value)
     }
