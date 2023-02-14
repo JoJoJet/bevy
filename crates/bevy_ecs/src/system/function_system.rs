@@ -10,6 +10,8 @@ use crate::{
 use bevy_ecs_macros::all_tuples;
 use std::borrow::Cow;
 
+use super::ReadOnlySystem;
+
 /// The metadata of a [`System`].
 #[derive(Clone)]
 pub struct SystemMeta {
@@ -320,6 +322,20 @@ pub trait IntoSystem<In, Out, Params>: Sized {
     type System: System<In = In, Out = Out>;
     /// Turns this value into its corresponding [`System`].
     fn into_system(this: Self) -> Self::System;
+}
+
+/// Conversion trait to turn something into a [`ReadOnlySystem`].
+/// This is a shorthand for `IntoSystem<In, Out, Params> where Self::System: ReadOnlySystem`.
+pub trait IntoReadOnlySystem<In, Out, Params>: IntoSystem<In, Out, Params> {
+    type System: ReadOnlySystem;
+}
+
+impl<In, Out, Params, T> IntoReadOnlySystem<In, Out, Params> for T
+where
+    T: IntoSystem<In, Out, Params>,
+    T::System: ReadOnlySystem,
+{
+    type System = T::System;
 }
 
 pub struct AlreadyWasSystem;
