@@ -12,7 +12,7 @@ use super::{prototype::SystemPrototype, ParamSet, SystemParam, SystemParamItem};
 ///
 /// ```
 /// use bevy_ecs::prelude::*;
-/// use bevy_ecs::system::{CombinatorPrototype, Combine};
+/// use bevy_ecs::system::{CombinatorPrototype, SystemPrototype, Combine};
 ///
 /// // A system combinator that performs an exclusive-or (XOR)
 /// // operation on the output of two systems.
