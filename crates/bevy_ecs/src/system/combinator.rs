@@ -147,7 +147,7 @@ where
         Func::combine(
             input,
             // SAFETY: Since these closures are `!Send + !Synd + !'static`, they can never
-            // be called in parallel. Since mutable access to `world` only exists within
+            // be called in parallel. Since mutable access to `param` only exists within
             // the scope of either closure, we can be sure they will never alias one another.
             |input| {
                 self.a
