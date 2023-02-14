@@ -1,6 +1,6 @@
 use std::marker::PhantomData;
 
-use crate::system::{BoxedSystem, CombinatorPrototype, Combine, SystemPrototype};
+use crate::system::{BoxedSystem, CombinatorPrototype, Combine, SystemParam, SystemPrototype};
 use crate::world::World;
 
 pub type BoxedCondition = BoxedSystem<(), bool>;
@@ -314,7 +314,6 @@ where
     type Out = <T::Out as std::ops::Not>::Output;
 
     type Param = T::Param;
-    type State = T::State;
 
     fn run_parallel(
         &mut self,
@@ -328,7 +327,7 @@ where
         &mut self,
         input: Self::In,
         world: &mut World,
-        state: &mut Self::State,
+        state: &mut <T::Param as SystemParam>::State,
         system_meta: &crate::system::SystemMeta,
     ) -> Self::Out {
         !self.inner.run_exclusive(input, world, state, system_meta)

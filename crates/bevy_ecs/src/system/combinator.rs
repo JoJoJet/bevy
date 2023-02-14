@@ -132,7 +132,6 @@ where
     type Out = Func::Out;
 
     type Param = ParamSet<'static, 'static, (A::Param, B::Param)>;
-    type State = <Self::Param as SystemParam>::State;
 
     // clippy is way too strict with the formatting it expects
     #[allow(clippy::undocumented_unsafe_blocks)]
@@ -166,7 +165,7 @@ where
         &mut self,
         input: Self::In,
         world: &mut World,
-        (state_a, state_b): &mut Self::State,
+        (state_a, state_b): &mut <Self::Param as SystemParam>::State,
         system_meta: &super::SystemMeta,
     ) -> Self::Out {
         // SAFETY: Converting `&mut T` -> `&UnsafeCell<T>`

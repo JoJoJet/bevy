@@ -18,15 +18,14 @@ pub trait SystemPrototype<Marker>: Sized + Send + Sync + 'static {
     type In;
     type Out;
 
-    type Param: SystemParam<State = Self::State>;
-    type State: Send + Sync + 'static;
+    type Param: SystemParam;
 
     fn run_parallel(&mut self, input: Self::In, param: SystemParamItem<Self::Param>) -> Self::Out;
     fn run_exclusive(
         &mut self,
         input: Self::In,
         world: &mut World,
-        state: &mut Self::State,
+        state: &mut <Self::Param as SystemParam>::State,
         system_meta: &SystemMeta,
     ) -> Self::Out;
 }
@@ -41,7 +40,6 @@ where
     type Out = F::Out;
 
     type Param = F::Param;
-    type State = <F::Param as SystemParam>::State;
 
     fn run_parallel(&mut self, input: Self::In, param: SystemParamItem<Self::Param>) -> Self::Out {
         self.run(input, param)
@@ -51,7 +49,7 @@ where
         &mut self,
         input: Self::In,
         world: &mut World,
-        state: &mut Self::State,
+        state: &mut <F::Param as SystemParam>::State,
         system_meta: &SystemMeta,
     ) -> Self::Out {
         let change_tick = world.change_tick();
@@ -71,7 +69,6 @@ where
     type Out = F::Out;
 
     type Param = WithState<F::Param>;
-    type State = <F::Param as ExclusiveSystemParam>::State;
 
     fn run_parallel(
         &mut self,
@@ -85,7 +82,7 @@ where
         &mut self,
         input: Self::In,
         world: &mut World,
-        state: &mut Self::State,
+        state: &mut <F::Param as ExclusiveSystemParam>::State,
         system_meta: &SystemMeta,
     ) -> Self::Out {
         let param = F::Param::get_param(state, system_meta);
@@ -119,7 +116,7 @@ where
     T: SystemPrototype<Marker>,
 {
     prototype: T,
-    param_state: Option<T::State>,
+    param_state: Option<<T::Param as SystemParam>::State>,
     system_meta: SystemMeta,
     world_id: Option<WorldId>,
     archetype_generation: ArchetypeGeneration,
