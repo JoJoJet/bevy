@@ -108,6 +108,7 @@ impl<Func, A, B> CombinatorPrototype<Func, A, B> {
     }
 }
 
+#[doc(hidden)]
 pub struct IsCombinator;
 
 impl<A, B, MarkerA, MarkerB, Func> SystemPrototype<(IsCombinator, Func, MarkerA, MarkerB)>
