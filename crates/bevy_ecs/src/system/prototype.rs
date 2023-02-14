@@ -8,8 +8,8 @@ use crate::{
 
 use super::{
     check_system_change_tick, ExclusiveSystemParam, ExclusiveSystemParamFunction,
-    IsExclusiveFunctionSystem, IsFunctionSystem, ReadOnlySystem, System, SystemMeta, SystemParam,
-    SystemParamFunction, SystemParamItem,
+    IsExclusiveFunctionSystem, IsFunctionSystem, ReadOnlySystem, ReadOnlySystemParam, System,
+    SystemMeta, SystemParam, SystemParamFunction, SystemParamItem,
 };
 
 pub trait SystemPrototype<Marker>: Send + Sync + 'static {
@@ -247,6 +247,6 @@ unsafe impl<Marker, T> ReadOnlySystem for PrototypeSystem<Marker, T>
 where
     Marker: 'static,
     T: SystemPrototype<Marker>,
-    T::Param: ReadOnlySystem,
+    T::Param: ReadOnlySystemParam,
 {
 }
