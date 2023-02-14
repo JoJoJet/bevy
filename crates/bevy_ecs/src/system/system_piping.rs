@@ -7,7 +7,7 @@ use super::{prototype::SystemPrototype, CombinatorPrototype, Combine};
 /// Given two systems `A` and `B`, A may be piped into `B` as `A.pipe(B)` if the output type of `A` is
 /// equal to the input type of `B`.
 ///
-/// Note that for [`FunctionSystem`](crate::system::FunctionSystem)s the output is the return value
+/// Note that for function systemss, the output is the return value
 /// of the function and the input is the first [`SystemParam`](crate::system::SystemParam) if it is
 /// tagged with [`In`](crate::system::In) or `()` if the function has no designated input parameter.
 ///
