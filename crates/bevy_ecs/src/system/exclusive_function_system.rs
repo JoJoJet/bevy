@@ -5,7 +5,7 @@ use crate::{
     query::Access,
     system::{
         check_system_change_tick, ExclusiveSystemParam, ExclusiveSystemParamItem, In, InputMarker,
-        IntoSystem, System, SystemMeta,
+        System, SystemMeta,
     },
     world::{World, WorldId},
 };
@@ -31,23 +31,6 @@ where
 }
 
 pub struct IsExclusiveFunctionSystem;
-
-impl<Marker, F> IntoSystem<F::In, F::Out, (IsExclusiveFunctionSystem, Marker)> for F
-where
-    Marker: 'static,
-    F: ExclusiveSystemParamFunction<Marker>,
-{
-    type System = ExclusiveFunctionSystem<Marker, F>;
-    fn into_system(func: Self) -> Self::System {
-        ExclusiveFunctionSystem {
-            func,
-            param_state: None,
-            system_meta: SystemMeta::new::<F>(),
-            world_id: None,
-            marker: PhantomData,
-        }
-    }
-}
 
 const PARAM_MESSAGE: &str = "System's param_state was not found. Did you forget to initialize this system before running it?";
 

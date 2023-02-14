@@ -386,24 +386,6 @@ where
 
 pub struct IsFunctionSystem;
 
-impl<Marker, F> IntoSystem<F::In, F::Out, (IsFunctionSystem, Marker)> for F
-where
-    Marker: 'static,
-    F: SystemParamFunction<Marker>,
-{
-    type System = FunctionSystem<Marker, F>;
-    fn into_system(func: Self) -> Self::System {
-        FunctionSystem {
-            func,
-            param_state: None,
-            system_meta: SystemMeta::new::<F>(),
-            world_id: None,
-            archetype_generation: ArchetypeGeneration::initial(),
-            marker: PhantomData,
-        }
-    }
-}
-
 impl<Marker, F> FunctionSystem<Marker, F>
 where
     F: SystemParamFunction<Marker>,

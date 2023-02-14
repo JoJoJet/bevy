@@ -7,7 +7,7 @@ use crate::{
 };
 
 use super::{
-    check_system_change_tick, ExclusiveSystemParam, ExclusiveSystemParamFunction,
+    check_system_change_tick, ExclusiveSystemParam, ExclusiveSystemParamFunction, IntoSystem,
     IsExclusiveFunctionSystem, IsFunctionSystem, ReadOnlySystem, ReadOnlySystemParam, System,
     SystemMeta, SystemParam, SystemParamFunction, SystemParamItem,
 };
@@ -249,4 +249,24 @@ where
     T: SystemPrototype<Marker>,
     T::Param: ReadOnlySystemParam,
 {
+}
+
+pub struct IsPrototypeSystem;
+
+impl<Marker, T> IntoSystem<T::In, T::Out, (IsPrototypeSystem, Marker)> for T
+where
+    Marker: 'static,
+    T: SystemPrototype<Marker>,
+{
+    type System = PrototypeSystem<Marker, T>;
+    fn into_system(prototype: Self) -> Self::System {
+        PrototypeSystem {
+            prototype,
+            param_state: None,
+            system_meta: SystemMeta::new::<T>(),
+            world_id: None,
+            archetype_generation: ArchetypeGeneration::initial(),
+            marker: PhantomData,
+        }
+    }
 }
