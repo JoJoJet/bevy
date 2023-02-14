@@ -11,6 +11,8 @@ use super::{prototype::SystemPrototype, CombinatorPrototype, Combine};
 /// of the function and the input is the first [`SystemParam`](crate::system::SystemParam) if it is
 /// tagged with [`In`](crate::system::In) or `()` if the function has no designated input parameter.
 ///
+/// [`System`]: crate::system::System
+///
 /// # Examples
 ///
 /// ```
