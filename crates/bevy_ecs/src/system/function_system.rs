@@ -327,7 +327,7 @@ pub trait IntoSystem<In, Out, Params>: Sized {
 /// Conversion trait to turn something into a [`ReadOnlySystem`].
 /// This is a shorthand for `IntoSystem<In, Out, Params> where Self::System: ReadOnlySystem`.
 pub trait IntoReadOnlySystem<In, Out, Params>: IntoSystem<In, Out, Params> {
-    type System: ReadOnlySystem;
+    type ReadOnlySystem: ReadOnlySystem;
 }
 
 impl<In, Out, Params, T> IntoReadOnlySystem<In, Out, Params> for T
@@ -335,7 +335,7 @@ where
     T: IntoSystem<In, Out, Params>,
     T::System: ReadOnlySystem,
 {
-    type System = T::System;
+    type ReadOnlySystem = T::System;
 }
 
 pub struct AlreadyWasSystem;
