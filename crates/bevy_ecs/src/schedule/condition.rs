@@ -6,7 +6,7 @@ pub type BoxedCondition = BoxedSystem<(), bool>;
 ///
 /// Implemented for functions and closures that convert into [`System<In=(), Out=bool>`](crate::system::System)
 /// with [read-only](crate::system::ReadOnlySystemParam) parameters.
-pub trait Condition<Params>: sealed::Condition<Params> {
+pub trait Condition<Marker>: sealed::Condition<Marker> {
     /// Returns a new run condition that only returns `true`
     /// if both this one and the passed `and_then` return `true`.
     ///
@@ -51,7 +51,7 @@ pub trait Condition<Params>: sealed::Condition<Params> {
     /// Note that in this case, it's better to just use the run condition [`resource_exists_and_equals`].
     ///
     /// [`resource_exists_and_equals`]: common_conditions::resource_exists_and_equals
-    fn and_then<P, C: Condition<P>>(self, and_then: C) -> AndThen<Self, C, Params, P> {
+    fn and_then<P, C: Condition<P>>(self, and_then: C) -> AndThen<Self, C, Marker, P> {
         AndThen::new(self, and_then)
     }
 
@@ -95,21 +95,21 @@ pub trait Condition<Params>: sealed::Condition<Params> {
     /// # app.run(&mut world);
     /// # assert!(world.resource::<C>().0);
     /// ```
-    fn or_else<P, C: Condition<P>>(self, or_else: C) -> OrElse<Self, C, Params, P> {
+    fn or_else<P, C: Condition<P>>(self, or_else: C) -> OrElse<Self, C, Marker, P> {
         OrElse::new(self, or_else)
     }
 }
 
-impl<Params, F> Condition<Params> for F where F: sealed::Condition<Params> {}
+impl<Marker, F> Condition<Marker> for F where F: sealed::Condition<Marker> {}
 
 mod sealed {
     use crate::system::{ReadOnlySystemParam, SystemPrototype};
 
-    pub trait Condition<Params>: SystemPrototype<Params, In = (), Out = bool> {}
+    pub trait Condition<Marker>: SystemPrototype<Marker, In = (), Out = bool> {}
 
-    impl<Params, F> Condition<Params> for F
+    impl<Marker, F> Condition<Marker> for F
     where
-        F: SystemPrototype<Params, In = (), Out = bool>,
+        F: SystemPrototype<Marker, In = (), Out = bool>,
         F::Param: ReadOnlySystemParam,
     {
     }
@@ -228,7 +228,7 @@ pub mod common_conditions {
     /// #
     /// # fn my_system() { unreachable!() }
     /// ```
-    pub fn not<Params: 'static, C: Condition<Params>>(condition: C) -> impl Condition<()>
+    pub fn not<Marker: 'static, C: Condition<Marker>>(condition: C) -> impl Condition<()>
     where
         C::Param: ReadOnlySystemParam,
     {
