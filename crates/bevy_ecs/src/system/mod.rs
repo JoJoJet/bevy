@@ -110,12 +110,12 @@ mod system;
 mod system_param;
 mod system_piping;
 
-pub use prototype::*;
 pub use combinator::*;
 pub use commands::*;
 pub use exclusive_function_system::*;
 pub use exclusive_system_param::*;
 pub use function_system::*;
+pub use prototype::*;
 pub use query::*;
 pub use system::*;
 pub use system_param::*;
