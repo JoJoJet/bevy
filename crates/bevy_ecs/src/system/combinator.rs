@@ -12,19 +12,19 @@ use super::{prototype::SystemPrototype, ParamSet, SystemParam, SystemParamItem};
 ///
 /// ```
 /// use bevy_ecs::prelude::*;
-/// use bevy_ecs::system::{CombinatorSystem, Combine};
+/// use bevy_ecs::system::{CombinatorPrototype, Combine};
 ///
 /// // A system combinator that performs an exclusive-or (XOR)
 /// // operation on the output of two systems.
-/// pub type Xor<A, B> = CombinatorSystem<XorMarker, A, B>;
+/// pub type Xor<A, B, MarkerA, MarkerB> = CombinatorPrototype<XorMarker, A, B, MarkerA, MarkerB>;
 ///
 /// // This struct is used to customize the behavior of our combinator.
 /// pub struct XorMarker;
 ///
-/// impl<A, B> Combine<A, B> for XorMarker
+/// impl<A, B, MarkerA, MarkerB> Combine<A, B, MarkerA, MarkerB> for XorMarker
 /// where
-///     A: System<In = (), Out = bool>,
-///     B: System<In = (), Out = bool>,
+///     A: SystemPrototype<MarkerA, In = (), Out = bool>,
+///     B: SystemPrototype<MarkerB, In = (), Out = bool>,
 /// {
 ///     type In = ();
 ///     type Out = bool;
@@ -46,10 +46,8 @@ use super::{prototype::SystemPrototype, ParamSet, SystemParam, SystemParamItem};
 /// #
 /// # let mut app = Schedule::new();
 /// app.add_system(my_system.run_if(Xor::new(
-///     IntoSystem::into_system(resource_equals(A(1))),
-///     IntoSystem::into_system(resource_equals(B(1))),
-///     // The name of the combined system.
-///     std::borrow::Cow::Borrowed("a ^ b"),
+///     resource_equals(A(1)),
+///     resource_equals(B(1)),
 /// )));
 /// # fn my_system(mut flag: ResMut<RanFlag>) { flag.0 = true; }
 /// #
