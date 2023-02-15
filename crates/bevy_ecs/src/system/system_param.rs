@@ -226,7 +226,7 @@ unsafe impl<Q: WorldQuery + 'static, F: ReadOnlyWorldQuery + 'static> SystemPara
     #[inline]
     unsafe fn get_param<'w, 's>(
         state: &'s mut Self::State,
-        system_meta: &SystemMeta,
+        _system_meta: &SystemMeta,
         world: &'w World,
         last_change_tick: u32,
         change_tick: u32,
@@ -482,7 +482,7 @@ unsafe impl<'a, T: Resource> SystemParam for Option<Res<'a, T>> {
     #[inline]
     unsafe fn get_param<'w, 's>(
         &mut component_id: &'s mut Self::State,
-        system_meta: &SystemMeta,
+        _system_meta: &SystemMeta,
         world: &'w World,
         last_change_tick: u32,
         change_tick: u32,
@@ -576,7 +576,7 @@ unsafe impl<'a, T: Resource> SystemParam for Option<ResMut<'a, T>> {
     #[inline]
     unsafe fn get_param<'w, 's>(
         &mut component_id: &'s mut Self::State,
-        system_meta: &SystemMeta,
+        _system_meta: &SystemMeta,
         world: &'w World,
         last_change_tick: u32,
         change_tick: u32,
@@ -1076,7 +1076,7 @@ unsafe impl<T: 'static> SystemParam for Option<NonSend<'_, T>> {
     #[inline]
     unsafe fn get_param<'w, 's>(
         &mut component_id: &'s mut Self::State,
-        system_meta: &SystemMeta,
+        _system_meta: &SystemMeta,
         world: &'w World,
         last_change_tick: u32,
         change_tick: u32,
@@ -1164,7 +1164,7 @@ unsafe impl<'a, T: 'static> SystemParam for Option<NonSendMut<'a, T>> {
     #[inline]
     unsafe fn get_param<'w, 's>(
         &mut component_id: &'s mut Self::State,
-        system_meta: &SystemMeta,
+        _system_meta: &SystemMeta,
         world: &'w World,
         last_change_tick: u32,
         change_tick: u32,
@@ -1308,7 +1308,7 @@ unsafe impl SystemParam for SystemChangeTick {
 
     unsafe fn get_param<'w, 's>(
         _state: &'s mut Self::State,
-        system_meta: &SystemMeta,
+        _system_meta: &SystemMeta,
         _world: &'w World,
         last_change_tick: u32,
         change_tick: u32,
