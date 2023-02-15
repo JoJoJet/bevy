@@ -111,7 +111,7 @@ impl<Func, A, B> CombinatorPrototype<Func, A, B> {
 #[doc(hidden)]
 pub struct IsCombinator;
 
-impl<A, B, MarkerA, MarkerB, Func> SystemPrototype<(IsCombinator, Func, MarkerA, MarkerB)>
+impl<A, B, MarkerA, MarkerB, Func> SystemPrototype<(IsCombinator, MarkerA, MarkerB)>
     for CombinatorPrototype<Func, A, B>
 where
     MarkerA: 'static,
