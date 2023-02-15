@@ -105,13 +105,18 @@ impl<Marker, F> Condition<Marker> for F where F: sealed::Condition<Marker> {}
 mod sealed {
     use crate::system::{ReadOnlySystemParam, SystemPrototype};
 
-    pub trait Condition<Marker>: SystemPrototype<Marker, In = (), Out = bool> {}
+    pub trait Condition<Marker>:
+        SystemPrototype<Marker, In = (), Out = bool, Param = Self::ReadOnlyParam>
+    {
+        type ReadOnlyParam: ReadOnlySystemParam;
+    }
 
     impl<Marker, F> Condition<Marker> for F
     where
         F: SystemPrototype<Marker, In = (), Out = bool>,
         F::Param: ReadOnlySystemParam,
     {
+        type ReadOnlyParam = F::Param;
     }
 }
 
@@ -119,7 +124,7 @@ pub mod common_conditions {
     use super::Condition;
     use crate::{
         schedule::{State, States},
-        system::{MapPrototype, ReadOnlySystemParam, Res, Resource},
+        system::{MapPrototype, Res, Resource},
     };
 
     /// Generates a [`Condition`](super::Condition)-satisfying closure that returns `true`
@@ -225,12 +230,7 @@ pub mod common_conditions {
     /// #
     /// # fn my_system() { unreachable!() }
     /// ```
-    pub fn not<Marker: 'static, Param>(
-        condition: impl Condition<Marker, Param = Param>,
-    ) -> impl Condition<(), Param = Param>
-    where
-        Param: ReadOnlySystemParam,
-    {
+    pub fn not<Marker: 'static>(condition: impl Condition<Marker>) -> impl Condition<()> {
         MapPrototype::new(condition, |x| !x)
     }
 }
