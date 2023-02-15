@@ -4,13 +4,13 @@ use crate::{
     component::ComponentId,
     prelude::FromWorld,
     query::{Access, FilteredAccessSet},
-    system::{ReadOnlySystemParam, System, SystemParam, SystemParamItem},
+    system::{Local, ReadOnlySystemParam, System, SystemParam, SystemParamItem},
     world::{World, WorldId},
 };
 use bevy_ecs_macros::all_tuples;
 use std::borrow::Cow;
 
-use super::ReadOnlySystem;
+use super::{check_system_change_tick, ReadOnlySystem, SystemPrototype};
 
 /// The metadata of a [`System`].
 #[derive(Clone)]
@@ -385,6 +385,109 @@ pub struct In<In>(pub In);
 pub struct InputMarker;
 
 pub struct IsFunctionSystem;
+
+#[doc(hidden)]
+pub struct LastChangeTick(pub(crate) u32);
+
+impl FromWorld for LastChangeTick {
+    fn from_world(world: &mut World) -> Self {
+        let tick = world.change_tick().wrapping_sub(MAX_CHANGE_AGE);
+        Self(tick)
+    }
+}
+
+impl<Marker, F> SystemPrototype<(IsFunctionSystem, Marker)> for F
+where
+    F: SystemParamFunction<Marker>,
+{
+    const IS_EXCLUSIVE: bool = false;
+
+    type In = F::In;
+    type Out = F::Out;
+
+    type Param = (
+        Local<'static, LastChangeTick>,
+        Local<'static, ArchetypeGeneration>,
+        F::Param,
+    );
+
+    fn update_archetype_component_access(
+        &mut self,
+        state: &mut <Self::Param as SystemParam>::State,
+        system_meta: &mut SystemMeta,
+        world: &World,
+    ) {
+        let archetype_generation = state.1.get();
+        let archetypes = world.archetypes();
+        let new_generation = archetypes.generation();
+        let old_generation = std::mem::replace(archetype_generation, new_generation);
+        let archetype_index_range = old_generation.value()..new_generation.value();
+
+        for archetype_index in archetype_index_range {
+            F::Param::new_archetype(
+                &mut state.2,
+                &archetypes[ArchetypeId::new(archetype_index)],
+                system_meta,
+            );
+        }
+    }
+
+    fn run_parallel(
+        &mut self,
+        input: Self::In,
+        world: &World,
+        (last_change_tick, _, state): &mut <Self::Param as SystemParam>::State,
+        system_meta: &SystemMeta,
+    ) -> Self::Out {
+        let last_change_tick = &mut last_change_tick.get().0;
+        let change_tick = world.read_change_tick();
+        // SAFETY: shut up clippy
+        let params = unsafe {
+            F::Param::get_param(state, system_meta, world, change_tick, *last_change_tick)
+        };
+        let output = self.run(input, params);
+        *last_change_tick = change_tick;
+        output
+    }
+
+    fn run_exclusive(
+        &mut self,
+        input: Self::In,
+        world: &mut World,
+        state: &mut <Self::Param as SystemParam>::State,
+        system_meta: &mut SystemMeta,
+    ) -> Self::Out {
+        self.update_archetype_component_access(state, system_meta, world);
+        self.run_parallel(input, world, state, system_meta)
+    }
+
+    fn check_change_tick(
+        &mut self,
+        (last_change_tick, ..): &mut <Self::Param as SystemParam>::State,
+        change_tick: u32,
+    ) {
+        check_system_change_tick(
+            &mut last_change_tick.get().0,
+            change_tick,
+            std::any::type_name::<F>(),
+        );
+    }
+
+    fn get_last_change_tick(
+        &self,
+        (last_change_tick, ..): &<Self::Param as SystemParam>::State,
+    ) -> u32 {
+        last_change_tick.read().0
+    }
+
+    fn set_last_change_tick(
+        &mut self,
+        (last_change_tick, ..): &mut <Self::Param as SystemParam>::State,
+        change_tick: u32,
+    ) {
+        last_change_tick.get().0 = change_tick;
+    }
+}
 
 /// A trait implemented for all functions that can be used as [`System`]s.
 ///
