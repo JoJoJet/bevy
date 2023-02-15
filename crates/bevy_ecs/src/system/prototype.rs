@@ -37,6 +37,20 @@ pub trait SystemPrototype<Marker>: Sized + Send + Sync + 'static {
     ) -> Self::Out {
         self.run_parallel(input, world, state, system_meta)
     }
+
+    fn check_change_tick(
+        &mut self,
+        state: &mut <Self::Param as SystemParam>::State,
+        change_tick: u32,
+    );
+
+    fn get_last_change_tick(&self, state: &<Self::Param as SystemParam>::State) -> u32;
+
+    fn set_last_change_tick(
+        &mut self,
+        state: &mut <Self::Param as SystemParam>::State,
+        change_tick: u32,
+    );
 }
 
 #[doc(hidden)]
@@ -76,6 +90,33 @@ where
         let output = self.run(input, params);
         *last_change_tick = change_tick;
         output
+    }
+
+    fn check_change_tick(
+        &mut self,
+        (last_change_tick, _): &mut <Self::Param as SystemParam>::State,
+        change_tick: u32,
+    ) {
+        check_system_change_tick(
+            &mut last_change_tick.get().0,
+            change_tick,
+            std::any::type_name::<F>(),
+        );
+    }
+
+    fn get_last_change_tick(
+        &self,
+        (last_change_tick, _): &<Self::Param as SystemParam>::State,
+    ) -> u32 {
+        last_change_tick.read().0
+    }
+
+    fn set_last_change_tick(
+        &mut self,
+        (last_change_tick, _): &mut <Self::Param as SystemParam>::State,
+        change_tick: u32,
+    ) {
+        last_change_tick.get().0 = change_tick;
     }
 }
 
@@ -121,6 +162,33 @@ where
 
         output
     }
+
+    fn check_change_tick(
+        &mut self,
+        (last_change_tick, _): &mut <Self::Param as SystemParam>::State,
+        change_tick: u32,
+    ) {
+        check_system_change_tick(
+            &mut last_change_tick.get().0,
+            change_tick,
+            std::any::type_name::<F>(),
+        );
+    }
+
+    fn get_last_change_tick(
+        &self,
+        (last_change_tick, _): &<Self::Param as SystemParam>::State,
+    ) -> u32 {
+        last_change_tick.read().0
+    }
+
+    fn set_last_change_tick(
+        &mut self,
+        (last_change_tick, _): &mut <Self::Param as SystemParam>::State,
+        change_tick: u32,
+    ) {
+        last_change_tick.get().0 = change_tick;
+    }
 }
 
 pub struct WithState<T>(PhantomData<T>);
@@ -154,7 +222,6 @@ where
     system_meta: SystemMeta,
     world_id: Option<WorldId>,
     archetype_generation: ArchetypeGeneration,
-    last_change_tick: u32,
     // NOTE: PhantomData<fn()-> T> gives this safe Send/Sync impls
     marker: PhantomData<fn() -> Marker>,
 }
@@ -224,7 +291,6 @@ where
 
     fn initialize(&mut self, world: &mut World) {
         self.world_id = Some(world.id());
-        self.last_change_tick = world.change_tick().wrapping_sub(MAX_CHANGE_AGE);
         self.param_state = Some(T::Param::init_state(world, &mut self.system_meta));
     }
 
@@ -247,19 +313,18 @@ where
     }
 
     fn check_change_tick(&mut self, change_tick: u32) {
-        check_system_change_tick(
-            &mut self.last_change_tick,
-            change_tick,
-            self.system_meta.name.as_ref(),
-        );
+        self.prototype
+            .check_change_tick(self.param_state.as_mut().unwrap(), change_tick);
     }
 
     fn get_last_change_tick(&self) -> u32 {
-        self.last_change_tick
+        self.prototype
+            .get_last_change_tick(self.param_state.as_ref().unwrap())
     }
 
     fn set_last_change_tick(&mut self, last_change_tick: u32) {
-        self.last_change_tick = last_change_tick;
+        self.prototype
+            .set_last_change_tick(self.param_state.as_mut().unwrap(), last_change_tick);
     }
 
     fn default_system_sets(&self) -> Vec<Box<dyn crate::schedule::SystemSet>> {
@@ -292,7 +357,6 @@ where
             system_meta: SystemMeta::new::<T>(),
             world_id: None,
             archetype_generation: ArchetypeGeneration::initial(),
-            last_change_tick: 0,
             marker: PhantomData,
         }
     }

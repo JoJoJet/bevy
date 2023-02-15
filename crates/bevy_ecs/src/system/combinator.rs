@@ -167,4 +167,32 @@ where
             },
         )
     }
+
+    fn check_change_tick(
+        &mut self,
+        (state_a, state_b): &mut <Self::Param as SystemParam>::State,
+        change_tick: u32,
+    ) {
+        self.a.check_change_tick(state_a, change_tick);
+        self.b.check_change_tick(state_b, change_tick);
+    }
+
+    fn get_last_change_tick(
+        &self,
+        (state_a, state_b): &<Self::Param as SystemParam>::State,
+    ) -> u32 {
+        u32::max(
+            self.a.get_last_change_tick(state_a),
+            self.b.get_last_change_tick(state_b),
+        )
+    }
+
+    fn set_last_change_tick(
+        &mut self,
+        (state_a, state_b): &mut <Self::Param as SystemParam>::State,
+        change_tick: u32,
+    ) {
+        self.a.set_last_change_tick(state_a, change_tick);
+        self.b.set_last_change_tick(state_b, change_tick);
+    }
 }

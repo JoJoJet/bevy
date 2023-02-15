@@ -274,6 +274,26 @@ pub mod common_conditions {
             ) -> Self::Out {
                 !self.inner.run_exclusive(input, world, state, system_meta)
             }
+
+            fn check_change_tick(
+                &mut self,
+                state: &mut <Self::Param as SystemParam>::State,
+                change_tick: u32,
+            ) {
+                self.inner.check_change_tick(state, change_tick);
+            }
+
+            fn get_last_change_tick(&self, state: &<Self::Param as SystemParam>::State) -> u32 {
+                self.inner.get_last_change_tick(state)
+            }
+
+            fn set_last_change_tick(
+                &mut self,
+                state: &mut <Self::Param as SystemParam>::State,
+                change_tick: u32,
+            ) {
+                self.inner.set_last_change_tick(state, change_tick);
+            }
         }
 
         Not {
