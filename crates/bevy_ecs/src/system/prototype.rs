@@ -120,8 +120,8 @@ where
         let archetype_index_range = old_generation.value()..new_generation.value();
 
         for archetype_index in archetype_index_range {
-            Self::Param::new_archetype(
-                state,
+            F::Param::new_archetype(
+                &mut state.2,
                 &archetypes[ArchetypeId::new(archetype_index)],
                 system_meta,
             );
