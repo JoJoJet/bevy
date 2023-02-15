@@ -124,7 +124,7 @@ pub mod common_conditions {
     use super::Condition;
     use crate::{
         schedule::{State, States},
-        system::{MapPrototype, Res, Resource},
+        system::{In, IntoPipeSystem, Res, Resource, WithMarker},
     };
 
     /// Generates a [`Condition`](super::Condition)-satisfying closure that returns `true`
@@ -231,7 +231,7 @@ pub mod common_conditions {
     /// # fn my_system() { unreachable!() }
     /// ```
     pub fn not<Marker: 'static>(condition: impl Condition<Marker>) -> impl Condition<()> {
-        MapPrototype::new(condition, |x| !x)
+        WithMarker::new(condition.pipe(|In(x): In<bool>| !x))
     }
 }
 

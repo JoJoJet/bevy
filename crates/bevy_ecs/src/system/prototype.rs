@@ -262,6 +262,93 @@ unsafe impl<T: ExclusiveSystemParam> SystemParam for WithState<T> {
     }
 }
 
+/// Wraps any [`SystemPrototype`] type, replacing its marker type
+/// with `()`.
+pub struct WithMarker<Marker, T>
+where
+    T: SystemPrototype<Marker>,
+{
+    inner: T,
+    _marker: PhantomData<fn() -> Marker>,
+}
+
+impl<Marker, T> WithMarker<Marker, T> where T: SystemPrototype<Marker> {
+    pub fn new(prototype: T) -> Self {
+        Self {
+            inner: prototype,
+            _marker: PhantomData,
+        }
+    }
+}
+
+impl<Marker, T> SystemPrototype<()> for WithMarker<Marker, T>
+where
+    Marker: 'static,
+    T: SystemPrototype<Marker>,
+{
+    const IS_EXCLUSIVE: bool = T::IS_EXCLUSIVE;
+
+    type In = T::In;
+    type Out = T::Out;
+    type Param = T::Param;
+
+    #[inline]
+    fn update_archetype_component_access(
+        &mut self,
+        state: &mut <Self::Param as SystemParam>::State,
+        system_meta: &mut SystemMeta,
+        world: &World,
+    ) {
+        self.inner
+            .update_archetype_component_access(state, system_meta, world);
+    }
+
+    #[inline]
+    fn run_parallel(
+        &mut self,
+        input: Self::In,
+        world: &World,
+        state: &mut <Self::Param as SystemParam>::State,
+        system_meta: &SystemMeta,
+    ) -> Self::Out {
+        self.inner.run_parallel(input, world, state, system_meta)
+    }
+
+    #[inline]
+    fn run_exclusive(
+        &mut self,
+        input: Self::In,
+        world: &mut World,
+        state: &mut <Self::Param as SystemParam>::State,
+        system_meta: &mut SystemMeta,
+    ) -> Self::Out {
+        self.inner.run_exclusive(input, world, state, system_meta)
+    }
+
+    #[inline]
+    fn check_change_tick(
+        &mut self,
+        state: &mut <Self::Param as SystemParam>::State,
+        change_tick: u32,
+    ) {
+        self.inner.check_change_tick(state, change_tick);
+    }
+
+    #[inline]
+    fn get_last_change_tick(&self, state: &<Self::Param as SystemParam>::State) -> u32 {
+        self.inner.get_last_change_tick(state)
+    }
+
+    #[inline]
+    fn set_last_change_tick(
+        &mut self,
+        state: &mut <Self::Param as SystemParam>::State,
+        change_tick: u32,
+    ) {
+        self.inner.set_last_change_tick(state, change_tick);
+    }
+}
+
 pub struct MapPrototype<Marker, T, F, Out>
 where
     T: SystemPrototype<Marker>,
