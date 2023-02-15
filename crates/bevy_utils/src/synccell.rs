@@ -29,6 +29,14 @@ impl<T: ?Sized> SyncCell<T> {
         &mut self.inner
     }
 
+    /// For [`Sync`] types, gets read-only access to this `SyncCell`'s inner value.
+    pub fn read(&self) -> &T
+    where
+        T: Sync,
+    {
+        &self.inner
+    }
+
     /// Build a mutable reference to a `SyncCell` from a mutable reference
     /// to its inner value, to skip constructing with [`new()`](SyncCell::new()).
     pub fn from_mut(r: &'_ mut T) -> &'_ mut SyncCell<T> {
