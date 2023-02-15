@@ -76,6 +76,7 @@ where
         state: &'s mut Self::State,
         system_meta: &SystemMeta,
         world: &'w World,
+        last_change_tick: u32,
         change_tick: u32,
     ) -> Self::Item<'w, 's> {
         // SAFETY:
@@ -85,6 +86,7 @@ where
             &mut state.main_world_state,
             system_meta,
             world,
+            last_change_tick,
             change_tick,
         );
         let item = state.state.get(main_world.into_inner());
