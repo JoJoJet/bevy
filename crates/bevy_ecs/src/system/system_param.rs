@@ -169,6 +169,7 @@ pub unsafe trait SystemParam: Sized {
         state: &'state mut Self::State,
         system_meta: &SystemMeta,
         world: &'world World,
+        last_change_tick: u32,
         change_tick: u32,
     ) -> Self::Item<'world, 'state>;
 }
@@ -227,15 +228,10 @@ unsafe impl<Q: WorldQuery + 'static, F: ReadOnlyWorldQuery + 'static> SystemPara
         state: &'s mut Self::State,
         system_meta: &SystemMeta,
         world: &'w World,
+        last_change_tick: u32,
         change_tick: u32,
     ) -> Self::Item<'w, 's> {
-        Query::new(
-            world,
-            state,
-            system_meta.last_change_tick,
-            change_tick,
-            false,
-        )
+        Query::new(world, state, last_change_tick, change_tick, false)
     }
 }
 
@@ -371,6 +367,7 @@ pub struct ParamSet<'w, 's, T: SystemParam> {
     param_states: &'s mut T::State,
     world: &'w World,
     system_meta: SystemMeta,
+    last_change_tick: u32,
     change_tick: u32,
 }
 
@@ -445,6 +442,7 @@ unsafe impl<'a, T: Resource> SystemParam for Res<'a, T> {
         &mut component_id: &'s mut Self::State,
         system_meta: &SystemMeta,
         world: &'w World,
+        last_change_tick: u32,
         change_tick: u32,
     ) -> Self::Item<'w, 's> {
         let (ptr, ticks) = world
@@ -462,7 +460,7 @@ unsafe impl<'a, T: Resource> SystemParam for Res<'a, T> {
             ticks: Ticks {
                 added: ticks.added.deref(),
                 changed: ticks.changed.deref(),
-                last_change_tick: system_meta.last_change_tick,
+                last_change_tick,
                 change_tick,
             },
         }
@@ -486,6 +484,7 @@ unsafe impl<'a, T: Resource> SystemParam for Option<Res<'a, T>> {
         &mut component_id: &'s mut Self::State,
         system_meta: &SystemMeta,
         world: &'w World,
+        last_change_tick: u32,
         change_tick: u32,
     ) -> Self::Item<'w, 's> {
         world
@@ -496,7 +495,7 @@ unsafe impl<'a, T: Resource> SystemParam for Option<Res<'a, T>> {
                 ticks: Ticks {
                     added: ticks.added.deref(),
                     changed: ticks.changed.deref(),
-                    last_change_tick: system_meta.last_change_tick,
+                    last_change_tick,
                     change_tick,
                 },
             })
@@ -540,6 +539,7 @@ unsafe impl<'a, T: Resource> SystemParam for ResMut<'a, T> {
         &mut component_id: &'s mut Self::State,
         system_meta: &SystemMeta,
         world: &'w World,
+        last_change_tick: u32,
         change_tick: u32,
     ) -> Self::Item<'w, 's> {
         let value = world
@@ -557,7 +557,7 @@ unsafe impl<'a, T: Resource> SystemParam for ResMut<'a, T> {
             ticks: TicksMut {
                 added: value.ticks.added,
                 changed: value.ticks.changed,
-                last_change_tick: system_meta.last_change_tick,
+                last_change_tick,
                 change_tick,
             },
         }
@@ -578,6 +578,7 @@ unsafe impl<'a, T: Resource> SystemParam for Option<ResMut<'a, T>> {
         &mut component_id: &'s mut Self::State,
         system_meta: &SystemMeta,
         world: &'w World,
+        last_change_tick: u32,
         change_tick: u32,
     ) -> Self::Item<'w, 's> {
         world
@@ -588,7 +589,7 @@ unsafe impl<'a, T: Resource> SystemParam for Option<ResMut<'a, T>> {
                 ticks: TicksMut {
                     added: value.ticks.added,
                     changed: value.ticks.changed,
-                    last_change_tick: system_meta.last_change_tick,
+                    last_change_tick,
                     change_tick,
                 },
             })
@@ -631,6 +632,7 @@ unsafe impl SystemParam for &'_ World {
         _state: &'s mut Self::State,
         _system_meta: &SystemMeta,
         world: &'w World,
+        _last_change_tick: u32,
         _change_tick: u32,
     ) -> Self::Item<'w, 's> {
         world
@@ -752,6 +754,7 @@ unsafe impl<'a, T: FromWorld + Send + 'static> SystemParam for Local<'a, T> {
         state: &'s mut Self::State,
         _system_meta: &SystemMeta,
         _world: &'w World,
+        _last_change_tick: u32,
         _change_tick: u32,
     ) -> Self::Item<'w, 's> {
         Local(state.get())
@@ -927,6 +930,7 @@ unsafe impl<T: SystemBuffer> SystemParam for Deferred<'_, T> {
         state: &'s mut Self::State,
         _system_meta: &SystemMeta,
         _world: &'w World,
+        _last_change_tick: u32,
         _change_tick: u32,
     ) -> Self::Item<'w, 's> {
         Deferred(state.get())
@@ -1034,6 +1038,7 @@ unsafe impl<'a, T: 'static> SystemParam for NonSend<'a, T> {
         &mut component_id: &'s mut Self::State,
         system_meta: &SystemMeta,
         world: &'w World,
+        last_change_tick: u32,
         change_tick: u32,
     ) -> Self::Item<'w, 's> {
         let (ptr, ticks) = world
@@ -1050,7 +1055,7 @@ unsafe impl<'a, T: 'static> SystemParam for NonSend<'a, T> {
         NonSend {
             value: ptr.deref(),
             ticks: ticks.read(),
-            last_change_tick: system_meta.last_change_tick,
+            last_change_tick,
             change_tick,
         }
     }
@@ -1073,6 +1078,7 @@ unsafe impl<T: 'static> SystemParam for Option<NonSend<'_, T>> {
         &mut component_id: &'s mut Self::State,
         system_meta: &SystemMeta,
         world: &'w World,
+        last_change_tick: u32,
         change_tick: u32,
     ) -> Self::Item<'w, 's> {
         world
@@ -1081,7 +1087,7 @@ unsafe impl<T: 'static> SystemParam for Option<NonSend<'_, T>> {
             .map(|(ptr, ticks)| NonSend {
                 value: ptr.deref(),
                 ticks: ticks.read(),
-                last_change_tick: system_meta.last_change_tick,
+                last_change_tick,
                 change_tick,
             })
     }
@@ -1126,6 +1132,7 @@ unsafe impl<'a, T: 'static> SystemParam for NonSendMut<'a, T> {
         &mut component_id: &'s mut Self::State,
         system_meta: &SystemMeta,
         world: &'w World,
+        last_change_tick: u32,
         change_tick: u32,
     ) -> Self::Item<'w, 's> {
         let (ptr, ticks) = world
@@ -1140,7 +1147,7 @@ unsafe impl<'a, T: 'static> SystemParam for NonSendMut<'a, T> {
             });
         NonSendMut {
             value: ptr.assert_unique().deref_mut(),
-            ticks: TicksMut::from_tick_cells(ticks, system_meta.last_change_tick, change_tick),
+            ticks: TicksMut::from_tick_cells(ticks, last_change_tick, change_tick),
         }
     }
 }
@@ -1159,6 +1166,7 @@ unsafe impl<'a, T: 'static> SystemParam for Option<NonSendMut<'a, T>> {
         &mut component_id: &'s mut Self::State,
         system_meta: &SystemMeta,
         world: &'w World,
+        last_change_tick: u32,
         change_tick: u32,
     ) -> Self::Item<'w, 's> {
         world
@@ -1166,7 +1174,7 @@ unsafe impl<'a, T: 'static> SystemParam for Option<NonSendMut<'a, T>> {
             .get_non_send_with_ticks(component_id)
             .map(|(ptr, ticks)| NonSendMut {
                 value: ptr.assert_unique().deref_mut(),
-                ticks: TicksMut::from_tick_cells(ticks, system_meta.last_change_tick, change_tick),
+                ticks: TicksMut::from_tick_cells(ticks, last_change_tick, change_tick),
             })
     }
 }
@@ -1186,6 +1194,7 @@ unsafe impl<'a> SystemParam for &'a Archetypes {
         _state: &'s mut Self::State,
         _system_meta: &SystemMeta,
         world: &'w World,
+        _last_change_tick: u32,
         _change_tick: u32,
     ) -> Self::Item<'w, 's> {
         world.archetypes()
@@ -1207,6 +1216,7 @@ unsafe impl<'a> SystemParam for &'a Components {
         _state: &'s mut Self::State,
         _system_meta: &SystemMeta,
         world: &'w World,
+        _last_change_tick: u32,
         _change_tick: u32,
     ) -> Self::Item<'w, 's> {
         world.components()
@@ -1228,6 +1238,7 @@ unsafe impl<'a> SystemParam for &'a Entities {
         _state: &'s mut Self::State,
         _system_meta: &SystemMeta,
         world: &'w World,
+        _last_change_tick: u32,
         _change_tick: u32,
     ) -> Self::Item<'w, 's> {
         world.entities()
@@ -1249,6 +1260,7 @@ unsafe impl<'a> SystemParam for &'a Bundles {
         _state: &'s mut Self::State,
         _system_meta: &SystemMeta,
         world: &'w World,
+        _last_change_tick: u32,
         _change_tick: u32,
     ) -> Self::Item<'w, 's> {
         world.bundles()
@@ -1298,10 +1310,11 @@ unsafe impl SystemParam for SystemChangeTick {
         _state: &'s mut Self::State,
         system_meta: &SystemMeta,
         _world: &'w World,
+        last_change_tick: u32,
         change_tick: u32,
     ) -> Self::Item<'w, 's> {
         SystemChangeTick {
-            last_change_tick: system_meta.last_change_tick,
+            last_change_tick,
             change_tick,
         }
     }
@@ -1368,6 +1381,7 @@ unsafe impl SystemParam for SystemName<'_> {
         name: &'s mut Self::State,
         _system_meta: &SystemMeta,
         _world: &'w World,
+        _last_change_tick: u32,
         _change_tick: u32,
     ) -> Self::Item<'w, 's> {
         SystemName { name }
@@ -1410,11 +1424,12 @@ macro_rules! impl_system_param_tuple {
                 state: &'s mut Self::State,
                 _system_meta: &SystemMeta,
                 _world: &'w World,
+                _last_change_tick: u32,
                 _change_tick: u32,
             ) -> Self::Item<'w, 's> {
 
                 let ($($param,)*) = state;
-                ($($param::get_param($param, _system_meta, _world, _change_tick),)*)
+                ($($param::get_param($param, _system_meta, _world, _change_tick, _last_change_tick),)*)
             }
         }
     };
@@ -1534,10 +1549,17 @@ unsafe impl<P: SystemParam + 'static> SystemParam for StaticSystemParam<'_, '_, 
         state: &'state mut Self::State,
         system_meta: &SystemMeta,
         world: &'world World,
+        last_change_tick: u32,
         change_tick: u32,
     ) -> Self::Item<'world, 'state> {
         // SAFETY: Defer to the safety of P::SystemParam
-        StaticSystemParam(P::get_param(state, system_meta, world, change_tick))
+        StaticSystemParam(P::get_param(
+            state,
+            system_meta,
+            world,
+            change_tick,
+            last_change_tick,
+        ))
     }
 }
 

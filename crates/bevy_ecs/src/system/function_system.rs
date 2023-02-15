@@ -21,7 +21,6 @@ pub struct SystemMeta {
     // NOTE: this must be kept private. making a SystemMeta non-send is irreversible to prevent
     // SystemParams from overriding each other
     pub(crate) is_send: bool,
-    pub(crate) last_change_tick: u32,
 }
 
 impl SystemMeta {
@@ -31,7 +30,6 @@ impl SystemMeta {
             archetype_component_access: Access::default(),
             component_access_set: FilteredAccessSet::default(),
             is_send: true,
-            last_change_tick: 0,
         }
     }
 
@@ -145,18 +143,20 @@ pub struct SystemState<Param: SystemParam + 'static> {
     param_state: Param::State,
     world_id: WorldId,
     archetype_generation: ArchetypeGeneration,
+    last_change_tick: u32,
 }
 
 impl<Param: SystemParam> SystemState<Param> {
     pub fn new(world: &mut World) -> Self {
+        let last_change_tick = world.change_tick().wrapping_sub(MAX_CHANGE_AGE);
         let mut meta = SystemMeta::new::<Param>();
-        meta.last_change_tick = world.change_tick().wrapping_sub(MAX_CHANGE_AGE);
         let param_state = Param::init_state(world, &mut meta);
         Self {
             meta,
             param_state,
             world_id: world.id(),
             archetype_generation: ArchetypeGeneration::initial(),
+            last_change_tick,
         }
     }
 
@@ -289,8 +289,14 @@ impl<Param: SystemParam> SystemState<Param> {
         world: &'w World,
         change_tick: u32,
     ) -> SystemParamItem<'w, 's, Param> {
-        let param = Param::get_param(&mut self.param_state, &self.meta, world, change_tick);
-        self.meta.last_change_tick = change_tick;
+        let param = Param::get_param(
+            &mut self.param_state,
+            &self.meta,
+            world,
+            change_tick,
+            self.last_change_tick,
+        );
+        self.last_change_tick = change_tick;
         param
     }
 }

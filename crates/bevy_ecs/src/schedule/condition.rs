@@ -261,8 +261,11 @@ pub mod common_conditions {
                 world: &World,
                 state: &mut <Self::Param as SystemParam>::State,
                 system_meta: &SystemMeta,
+                last_change_tick: u32,
             ) -> Self::Out {
-                !self.inner.run_parallel(input, world, state, system_meta)
+                !self
+                    .inner
+                    .run_parallel(input, world, state, system_meta, last_change_tick)
             }
 
             fn run_exclusive(
@@ -271,8 +274,11 @@ pub mod common_conditions {
                 world: &mut World,
                 state: &mut <T::Param as SystemParam>::State,
                 system_meta: &crate::system::SystemMeta,
+                last_change_tick: u32,
             ) -> Self::Out {
-                !self.inner.run_exclusive(input, world, state, system_meta)
+                !self
+                    .inner
+                    .run_exclusive(input, world, state, system_meta, last_change_tick)
             }
         }
 

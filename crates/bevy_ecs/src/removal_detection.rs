@@ -179,6 +179,7 @@ unsafe impl<'a> SystemParam for &'a RemovedComponentEvents {
         _state: &'s mut Self::State,
         _system_meta: &SystemMeta,
         world: &'w World,
+        _last_change_tick: u32,
         _change_tick: u32,
     ) -> Self::Item<'w, 's> {
         world.removed_components()

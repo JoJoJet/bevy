@@ -239,7 +239,7 @@ pub fn impl_param_set(_input: TokenStream) -> TokenStream {
                 // Conflicting params in ParamSet are not accessible at the same time
                 // ParamSets are guaranteed to not conflict with other SystemParams
                 unsafe {
-                    #param::get_param(&mut self.param_states.#index, &self.system_meta, self.world, self.change_tick)
+                    #param::get_param(&mut self.param_states.#index, &self.system_meta, self.world, self.last_change_tick, self.change_tick)
                 }
             }
         });
@@ -295,12 +295,14 @@ pub fn impl_param_set(_input: TokenStream) -> TokenStream {
                     state: &'s mut Self::State,
                     system_meta: &SystemMeta,
                     world: &'w World,
+                    last_change_tick: u32,
                     change_tick: u32,
                 ) -> Self::Item<'w, 's> {
                     ParamSet {
                         param_states: state,
                         system_meta: system_meta.clone(),
                         world,
+                        last_change_tick,
                         change_tick,
                     }
                 }
@@ -500,10 +502,11 @@ pub fn derive_system_param(input: TokenStream) -> TokenStream {
                     system_meta: &#path::system::SystemMeta,
                     world: &'w2 #path::world::World,
                     change_tick: u32,
+                    last_change_tick: u32,
                 ) -> Self::Item<'w2, 's2> {
                     let (#(#tuple_patterns,)*) = <
                         (#(#tuple_types,)*) as #path::system::SystemParam
-                    >::get_param(&mut state.state, system_meta, world, change_tick);
+                    >::get_param(&mut state.state, system_meta, world, change_tick, last_change_tick);
                     #struct_name {
                         #(#fields: #field_locals,)*
                         #(#ignored_fields: std::default::Default::default(),)*

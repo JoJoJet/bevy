@@ -26,6 +26,7 @@ pub trait SystemPrototype<Marker>: Sized + Send + Sync + 'static {
         world: &World,
         state: &mut <Self::Param as SystemParam>::State,
         system_meta: &SystemMeta,
+        last_change_tick: u32,
     ) -> Self::Out;
     fn run_exclusive(
         &mut self,
@@ -33,8 +34,9 @@ pub trait SystemPrototype<Marker>: Sized + Send + Sync + 'static {
         world: &mut World,
         state: &mut <Self::Param as SystemParam>::State,
         system_meta: &SystemMeta,
+        last_change_tick: u32,
     ) -> Self::Out {
-        self.run_parallel(input, world, state, system_meta)
+        self.run_parallel(input, world, state, system_meta, last_change_tick)
     }
 }
 
@@ -55,10 +57,13 @@ where
         world: &World,
         state: &mut <Self::Param as SystemParam>::State,
         system_meta: &SystemMeta,
+        last_change_tick: u32,
     ) -> Self::Out {
         let change_tick = world.read_change_tick();
         // SAFETY: shut up clippy
-        let params = unsafe { F::Param::get_param(state, system_meta, world, change_tick) };
+        let params = unsafe {
+            F::Param::get_param(state, system_meta, world, change_tick, last_change_tick)
+        };
         self.run(input, params)
     }
 }
@@ -80,6 +85,7 @@ where
         _world: &World,
         _state: &mut <Self::Param as SystemParam>::State,
         _system_meta: &SystemMeta,
+        _last_change_tick: u32,
     ) -> Self::Out {
         panic!("Cannot run exclusive systems with a shared World reference");
     }
@@ -90,6 +96,7 @@ where
         world: &mut World,
         state: &mut <F::Param as ExclusiveSystemParam>::State,
         system_meta: &SystemMeta,
+        _last_change_tick: u32,
     ) -> Self::Out {
         let param = F::Param::get_param(state, system_meta);
         self.run(world, input, param)
@@ -111,6 +118,7 @@ unsafe impl<T: ExclusiveSystemParam> SystemParam for WithState<T> {
         _state: &'state mut Self::State,
         _system_meta: &SystemMeta,
         _world: &'world World,
+        _last_change_tick: u32,
         _change_tick: u32,
     ) -> Self::Item<'world, 'state> {
         Self(PhantomData)
@@ -126,6 +134,7 @@ where
     system_meta: SystemMeta,
     world_id: Option<WorldId>,
     archetype_generation: ArchetypeGeneration,
+    last_change_tick: u32,
     // NOTE: PhantomData<fn()-> T> gives this safe Send/Sync impls
     marker: PhantomData<fn() -> Marker>,
 }
@@ -178,24 +187,26 @@ where
             world,
             self.param_state.as_mut().expect(PARAM_MESSAGE),
             &self.system_meta,
+            self.last_change_tick,
         );
-        self.system_meta.last_change_tick = change_tick;
+        self.last_change_tick = change_tick;
         out
     }
 
     fn run(&mut self, input: Self::In, world: &mut World) -> Self::Out {
         let saved_last_tick = world.last_change_tick;
-        world.last_change_tick = self.system_meta.last_change_tick;
+        world.last_change_tick = self.last_change_tick;
 
         let out = self.prototype.run_exclusive(
             input,
             world,
             self.param_state.as_mut().expect(PARAM_MESSAGE),
             &self.system_meta,
+            self.last_change_tick,
         );
 
         let change_tick = world.change_tick.get_mut();
-        self.system_meta.last_change_tick = *change_tick;
+        self.last_change_tick = *change_tick;
         *change_tick = change_tick.wrapping_add(1);
         world.last_change_tick = saved_last_tick;
 
@@ -209,7 +220,7 @@ where
 
     fn initialize(&mut self, world: &mut World) {
         self.world_id = Some(world.id());
-        self.system_meta.last_change_tick = world.change_tick().wrapping_sub(MAX_CHANGE_AGE);
+        self.last_change_tick = world.change_tick().wrapping_sub(MAX_CHANGE_AGE);
         self.param_state = Some(T::Param::init_state(world, &mut self.system_meta));
     }
 
@@ -233,18 +244,18 @@ where
 
     fn check_change_tick(&mut self, change_tick: u32) {
         check_system_change_tick(
-            &mut self.system_meta.last_change_tick,
+            &mut self.last_change_tick,
             change_tick,
             self.system_meta.name.as_ref(),
         );
     }
 
     fn get_last_change_tick(&self) -> u32 {
-        self.system_meta.last_change_tick
+        self.last_change_tick
     }
 
     fn set_last_change_tick(&mut self, last_change_tick: u32) {
-        self.system_meta.last_change_tick = last_change_tick;
+        self.last_change_tick = last_change_tick;
     }
 
     fn default_system_sets(&self) -> Vec<Box<dyn crate::schedule::SystemSet>> {
@@ -277,6 +288,7 @@ where
             system_meta: SystemMeta::new::<T>(),
             world_id: None,
             archetype_generation: ArchetypeGeneration::initial(),
+            last_change_tick: 0,
             marker: PhantomData,
         }
     }

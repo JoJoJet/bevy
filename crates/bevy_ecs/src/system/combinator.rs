@@ -133,11 +133,18 @@ where
         world: &World,
         (state_a, state_b): &mut <Self::Param as SystemParam>::State,
         system_meta: &SystemMeta,
+        last_change_tick: u32,
     ) -> Self::Out {
         Func::combine(
             input,
-            |input| self.a.run_parallel(input, world, state_a, system_meta),
-            |input| self.b.run_parallel(input, world, state_b, system_meta),
+            |input| {
+                self.a
+                    .run_parallel(input, world, state_a, system_meta, last_change_tick)
+            },
+            |input| {
+                self.b
+                    .run_parallel(input, world, state_b, system_meta, last_change_tick)
+            },
         )
     }
 
@@ -148,6 +155,7 @@ where
         world: &mut World,
         (state_a, state_b): &mut <Self::Param as SystemParam>::State,
         system_meta: &super::SystemMeta,
+        last_change_tick: u32,
     ) -> Self::Out {
         // SAFETY: Converting `&mut T` -> `&UnsafeCell<T>`
         // is explicitly allowed in the docs for `UnsafeCell`.
@@ -158,12 +166,22 @@ where
             // be called in parallel. Since mutable access to `world` only exists within
             // the scope of either closure, we can be sure they will never alias one another.
             |input| {
-                self.a
-                    .run_exclusive(input, unsafe { world.deref_mut() }, state_a, system_meta)
+                self.a.run_exclusive(
+                    input,
+                    unsafe { world.deref_mut() },
+                    state_a,
+                    system_meta,
+                    last_change_tick,
+                )
             },
             |input| {
-                self.b
-                    .run_exclusive(input, unsafe { world.deref_mut() }, state_b, system_meta)
+                self.b.run_exclusive(
+                    input,
+                    unsafe { world.deref_mut() },
+                    state_b,
+                    system_meta,
+                    last_change_tick,
+                )
             },
         )
     }
