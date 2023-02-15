@@ -3,13 +3,14 @@ use std::marker::PhantomData;
 use crate::{
     archetype::{ArchetypeGeneration, ArchetypeId},
     change_detection::MAX_CHANGE_AGE,
+    prelude::FromWorld,
     world::{World, WorldId},
 };
 
 use super::{
     check_system_change_tick, ExclusiveSystemParam, ExclusiveSystemParamFunction, IntoSystem,
-    IsExclusiveFunctionSystem, IsFunctionSystem, ReadOnlySystem, ReadOnlySystemParam, System,
-    SystemMeta, SystemParam, SystemParamFunction,
+    IsExclusiveFunctionSystem, IsFunctionSystem, Local, ReadOnlySystem, ReadOnlySystemParam,
+    System, SystemMeta, SystemParam, SystemParamFunction,
 };
 
 pub trait SystemPrototype<Marker>: Sized + Send + Sync + 'static {
@@ -26,7 +27,6 @@ pub trait SystemPrototype<Marker>: Sized + Send + Sync + 'static {
         world: &World,
         state: &mut <Self::Param as SystemParam>::State,
         system_meta: &SystemMeta,
-        last_change_tick: u32,
     ) -> Self::Out;
     fn run_exclusive(
         &mut self,
@@ -34,9 +34,18 @@ pub trait SystemPrototype<Marker>: Sized + Send + Sync + 'static {
         world: &mut World,
         state: &mut <Self::Param as SystemParam>::State,
         system_meta: &SystemMeta,
-        last_change_tick: u32,
     ) -> Self::Out {
-        self.run_parallel(input, world, state, system_meta, last_change_tick)
+        self.run_parallel(input, world, state, system_meta)
+    }
+}
+
+#[doc(hidden)]
+pub struct LastChangeTick(u32);
+
+impl FromWorld for LastChangeTick {
+    fn from_world(world: &mut World) -> Self {
+        let tick = world.change_tick().wrapping_sub(MAX_CHANGE_AGE);
+        Self(tick)
     }
 }
 
@@ -49,22 +58,24 @@ where
     type In = F::In;
     type Out = F::Out;
 
-    type Param = F::Param;
+    type Param = (Local<'static, LastChangeTick>, F::Param);
 
     fn run_parallel(
         &mut self,
         input: Self::In,
         world: &World,
-        state: &mut <Self::Param as SystemParam>::State,
+        (last_change_tick, state): &mut <Self::Param as SystemParam>::State,
         system_meta: &SystemMeta,
-        last_change_tick: u32,
     ) -> Self::Out {
+        let last_change_tick = &mut last_change_tick.get().0;
         let change_tick = world.read_change_tick();
         // SAFETY: shut up clippy
         let params = unsafe {
-            F::Param::get_param(state, system_meta, world, change_tick, last_change_tick)
+            F::Param::get_param(state, system_meta, world, change_tick, *last_change_tick)
         };
-        self.run(input, params)
+        let output = self.run(input, params);
+        *last_change_tick = change_tick;
+        output
     }
 }
 
@@ -77,7 +88,7 @@ where
     type In = F::In;
     type Out = F::Out;
 
-    type Param = WithState<F::Param>;
+    type Param = (Local<'static, LastChangeTick>, WithState<F::Param>);
 
     fn run_parallel(
         &mut self,
@@ -85,7 +96,6 @@ where
         _world: &World,
         _state: &mut <Self::Param as SystemParam>::State,
         _system_meta: &SystemMeta,
-        _last_change_tick: u32,
     ) -> Self::Out {
         panic!("Cannot run exclusive systems with a shared World reference");
     }
@@ -94,12 +104,22 @@ where
         &mut self,
         input: Self::In,
         world: &mut World,
-        state: &mut <F::Param as ExclusiveSystemParam>::State,
+        (last_change_tick, state): &mut <Self::Param as SystemParam>::State,
         system_meta: &SystemMeta,
-        _last_change_tick: u32,
     ) -> Self::Out {
+        let last_change_tick = &mut last_change_tick.get().0;
+        let saved_last_tick = world.last_change_tick;
+        world.last_change_tick = *last_change_tick;
+
         let param = F::Param::get_param(state, system_meta);
-        self.run(world, input, param)
+        let output = self.run(world, input, param);
+
+        let change_tick = world.change_tick.get_mut();
+        *last_change_tick = *change_tick;
+        *change_tick = change_tick.wrapping_add(1);
+        world.last_change_tick = saved_last_tick;
+
+        output
     }
 }
 
@@ -180,37 +200,21 @@ where
     }
 
     unsafe fn run_unsafe(&mut self, input: Self::In, world: &World) -> Self::Out {
-        let change_tick = world.increment_change_tick();
-
-        let out = self.prototype.run_parallel(
+        self.prototype.run_parallel(
             input,
             world,
             self.param_state.as_mut().expect(PARAM_MESSAGE),
             &self.system_meta,
-            self.last_change_tick,
-        );
-        self.last_change_tick = change_tick;
-        out
+        )
     }
 
     fn run(&mut self, input: Self::In, world: &mut World) -> Self::Out {
-        let saved_last_tick = world.last_change_tick;
-        world.last_change_tick = self.last_change_tick;
-
-        let out = self.prototype.run_exclusive(
+        self.prototype.run_exclusive(
             input,
             world,
             self.param_state.as_mut().expect(PARAM_MESSAGE),
             &self.system_meta,
-            self.last_change_tick,
-        );
-
-        let change_tick = world.change_tick.get_mut();
-        self.last_change_tick = *change_tick;
-        *change_tick = change_tick.wrapping_add(1);
-        world.last_change_tick = saved_last_tick;
-
-        out
+        )
     }
 
     fn apply_buffers(&mut self, world: &mut World) {
