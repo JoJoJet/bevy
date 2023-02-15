@@ -272,7 +272,10 @@ where
     _marker: PhantomData<fn() -> Marker>,
 }
 
-impl<Marker, T> WithMarker<Marker, T> where T: SystemPrototype<Marker> {
+impl<Marker, T> WithMarker<Marker, T>
+where
+    T: SystemPrototype<Marker>,
+{
     pub fn new(prototype: T) -> Self {
         Self {
             inner: prototype,
@@ -340,97 +343,6 @@ where
     }
 
     #[inline]
-    fn set_last_change_tick(
-        &mut self,
-        state: &mut <Self::Param as SystemParam>::State,
-        change_tick: u32,
-    ) {
-        self.inner.set_last_change_tick(state, change_tick);
-    }
-}
-
-pub struct MapPrototype<Marker, T, F, Out>
-where
-    T: SystemPrototype<Marker>,
-    F: FnMut(T::Out) -> Out,
-{
-    inner: T,
-    func: F,
-    _marker: PhantomData<fn() -> (Marker, Out)>,
-}
-
-impl<Marker, T, F, Out> MapPrototype<Marker, T, F, Out>
-where
-    T: SystemPrototype<Marker>,
-    F: FnMut(T::Out) -> Out,
-{
-    pub fn new(inner: T, func: F) -> Self {
-        Self {
-            inner,
-            func,
-            _marker: PhantomData,
-        }
-    }
-}
-
-impl<Marker, T, F, Out> SystemPrototype<()> for MapPrototype<Marker, T, F, Out>
-where
-    Marker: 'static,
-    T: SystemPrototype<Marker>,
-    F: FnMut(T::Out) -> Out + Send + Sync + 'static,
-    Out: 'static,
-{
-    type In = T::In;
-    type Out = Out;
-
-    type Param = T::Param;
-
-    const IS_EXCLUSIVE: bool = T::IS_EXCLUSIVE;
-
-    fn update_archetype_component_access(
-        &mut self,
-        state: &mut <Self::Param as SystemParam>::State,
-        system_meta: &mut SystemMeta,
-        world: &World,
-    ) {
-        self.inner
-            .update_archetype_component_access(state, system_meta, world);
-    }
-
-    fn run_parallel(
-        &mut self,
-        input: Self::In,
-        world: &World,
-        state: &mut <Self::Param as SystemParam>::State,
-        system_meta: &SystemMeta,
-    ) -> Self::Out {
-        let val = self.inner.run_parallel(input, world, state, system_meta);
-        (self.func)(val)
-    }
-
-    fn run_exclusive(
-        &mut self,
-        input: Self::In,
-        world: &mut World,
-        state: &mut <Self::Param as SystemParam>::State,
-        system_meta: &mut SystemMeta,
-    ) -> Self::Out {
-        let val = self.inner.run_exclusive(input, world, state, system_meta);
-        (self.func)(val)
-    }
-
-    fn check_change_tick(
-        &mut self,
-        state: &mut <Self::Param as SystemParam>::State,
-        change_tick: u32,
-    ) {
-        self.inner.check_change_tick(state, change_tick);
-    }
-
-    fn get_last_change_tick(&self, state: &<Self::Param as SystemParam>::State) -> u32 {
-        self.inner.get_last_change_tick(state)
-    }
-
     fn set_last_change_tick(
         &mut self,
         state: &mut <Self::Param as SystemParam>::State,
