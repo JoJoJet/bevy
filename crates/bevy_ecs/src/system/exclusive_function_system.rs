@@ -24,7 +24,7 @@ where
     type In = F::In;
     type Out = F::Out;
 
-    type Param = (Local<'static, LastChangeTick>, WithState<F::Param>);
+    type Param = (Local<'static, LastChangeTick>, AsParallel<F::Param>);
 
     fn update_archetype_component_access(
         &mut self,
@@ -94,10 +94,11 @@ where
     }
 }
 
-pub struct WithState<T>(PhantomData<T>);
+/// Allows using an [`ExclusiveSystemParam`] as a [`SystemParam`].
+pub struct AsParallel<T>(PhantomData<T>);
 
 // SAFETY: No world access.
-unsafe impl<T: ExclusiveSystemParam> SystemParam for WithState<T> {
+unsafe impl<T: ExclusiveSystemParam> SystemParam for AsParallel<T> {
     type State = T::State;
     type Item<'world, 'state> = Self;
 
