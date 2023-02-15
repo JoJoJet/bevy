@@ -1,7 +1,7 @@
 use std::marker::PhantomData;
 
 use crate::{
-    archetype::{Archetype, ArchetypeGeneration, ArchetypeId},
+    archetype::{ArchetypeGeneration, ArchetypeId},
     change_detection::MAX_CHANGE_AGE,
     prelude::FromWorld,
     world::{World, WorldId},
@@ -21,16 +21,12 @@ pub trait SystemPrototype<Marker>: Sized + Send + Sync + 'static {
 
     type Param: SystemParam;
 
-    fn new_archetypes(
+    fn update_archetype_component_access(
         &mut self,
         state: &mut <Self::Param as SystemParam>::State,
         system_meta: &mut SystemMeta,
-        archetypes: &[Archetype],
-    ) {
-        for archetype in archetypes {
-            Self::Param::new_archetype(state, archetype, system_meta);
-        }
-    }
+        world: &World,
+    );
 
     fn run_parallel(
         &mut self,
@@ -87,6 +83,27 @@ where
         F::Param,
     );
 
+    fn update_archetype_component_access(
+        &mut self,
+        state: &mut <Self::Param as SystemParam>::State,
+        system_meta: &mut SystemMeta,
+        world: &World,
+    ) {
+        let archetype_generation = state.1.get();
+        let archetypes = world.archetypes();
+        let new_generation = archetypes.generation();
+        let old_generation = std::mem::replace(archetype_generation, new_generation);
+        let archetype_index_range = old_generation.value()..new_generation.value();
+
+        for archetype_index in archetype_index_range {
+            F::Param::new_archetype(
+                &mut state.2,
+                &archetypes[ArchetypeId::new(archetype_index)],
+                system_meta,
+            );
+        }
+    }
+
     fn run_parallel(
         &mut self,
         input: Self::In,
@@ -112,21 +129,7 @@ where
         state: &mut <Self::Param as SystemParam>::State,
         system_meta: &mut SystemMeta,
     ) -> Self::Out {
-        // Update archetypes.
-        let archetype_generation = state.1.get();
-        let archetypes = world.archetypes();
-        let new_generation = archetypes.generation();
-        let old_generation = std::mem::replace(archetype_generation, new_generation);
-        let archetype_index_range = old_generation.value()..new_generation.value();
-
-        for archetype_index in archetype_index_range {
-            F::Param::new_archetype(
-                &mut state.2,
-                &archetypes[ArchetypeId::new(archetype_index)],
-                system_meta,
-            );
-        }
-
+        self.update_archetype_component_access(state, system_meta, world);
         self.run_parallel(input, world, state, system_meta)
     }
 
@@ -168,6 +171,14 @@ where
     type Out = F::Out;
 
     type Param = (Local<'static, LastChangeTick>, WithState<F::Param>);
+
+    fn update_archetype_component_access(
+        &mut self,
+        _state: &mut <Self::Param as SystemParam>::State,
+        _system_meta: &mut SystemMeta,
+        _world: &World,
+    ) {
+    }
 
     fn run_parallel(
         &mut self,
@@ -259,7 +270,6 @@ where
     param_state: Option<<T::Param as SystemParam>::State>,
     system_meta: SystemMeta,
     world_id: Option<WorldId>,
-    archetype_generation: ArchetypeGeneration,
     // NOTE: PhantomData<fn()-> T> gives this safe Send/Sync impls
     marker: PhantomData<fn() -> Marker>,
 }
@@ -336,19 +346,11 @@ where
     fn update_archetype_component_access(&mut self, world: &World) {
         assert!(self.world_id == Some(world.id()), "Encountered a mismatched World. A System cannot be used with Worlds other than the one it was initialized with.");
 
-        let archetypes = world.archetypes();
-        let new_generation = archetypes.generation();
-        let old_generation = std::mem::replace(&mut self.archetype_generation, new_generation);
-        let archetype_index_range = old_generation.value()..new_generation.value();
-
-        for archetype_index in archetype_index_range {
-            let param_state = self.param_state.as_mut().unwrap();
-            T::Param::new_archetype(
-                param_state,
-                &archetypes[ArchetypeId::new(archetype_index)],
-                &mut self.system_meta,
-            );
-        }
+        self.prototype.update_archetype_component_access(
+            self.param_state.as_mut().unwrap(),
+            &mut self.system_meta,
+            world,
+        );
     }
 
     fn check_change_tick(&mut self, change_tick: u32) {
@@ -395,7 +397,6 @@ where
             param_state: None,
             system_meta: SystemMeta::new::<T>(),
             world_id: None,
-            archetype_generation: ArchetypeGeneration::initial(),
             marker: PhantomData,
         }
     }

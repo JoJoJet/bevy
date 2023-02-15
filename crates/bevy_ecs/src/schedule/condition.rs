@@ -255,6 +255,16 @@ pub mod common_conditions {
 
             type Param = T::Param;
 
+            fn update_archetype_component_access(
+                &mut self,
+                state: &mut <Self::Param as SystemParam>::State,
+                system_meta: &mut SystemMeta,
+                world: &World,
+            ) {
+                self.inner
+                    .update_archetype_component_access(state, system_meta, world);
+            }
+
             fn run_parallel(
                 &mut self,
                 input: Self::In,

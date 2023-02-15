@@ -127,6 +127,18 @@ where
 
     type Param = ParamSet<'static, 'static, (A::Param, B::Param)>;
 
+    fn update_archetype_component_access(
+        &mut self,
+        (state_a, state_b): &mut <Self::Param as SystemParam>::State,
+        system_meta: &mut SystemMeta,
+        world: &World,
+    ) {
+        self.a
+            .update_archetype_component_access(state_a, system_meta, world);
+        self.b
+            .update_archetype_component_access(state_b, system_meta, world);
+    }
+
     fn run_parallel(
         &mut self,
         input: Self::In,
