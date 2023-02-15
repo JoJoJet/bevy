@@ -524,7 +524,7 @@ impl Archetype {
 }
 
 /// An opaque generational id that changes every time the set of [`Archetypes`] changes.
-#[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Default)]
 pub struct ArchetypeGeneration(usize);
 
 impl ArchetypeGeneration {

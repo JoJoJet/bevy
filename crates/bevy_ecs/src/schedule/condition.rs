@@ -270,7 +270,7 @@ pub mod common_conditions {
                 input: Self::In,
                 world: &mut World,
                 state: &mut <T::Param as SystemParam>::State,
-                system_meta: &crate::system::SystemMeta,
+                system_meta: &mut crate::system::SystemMeta,
             ) -> Self::Out {
                 !self.inner.run_exclusive(input, world, state, system_meta)
             }

@@ -147,23 +147,27 @@ where
         input: Self::In,
         world: &mut World,
         (state_a, state_b): &mut <Self::Param as SystemParam>::State,
-        system_meta: &super::SystemMeta,
+        system_meta: &mut super::SystemMeta,
     ) -> Self::Out {
         // SAFETY: Converting `&mut T` -> `&UnsafeCell<T>`
         // is explicitly allowed in the docs for `UnsafeCell`.
         let world: &UnsafeCell<World> = unsafe { std::mem::transmute(world) };
+        let system_meta: &UnsafeCell<super::SystemMeta> =
+            unsafe { std::mem::transmute(system_meta) };
         Func::combine(
             input,
             // SAFETY: Since these closures are `!Send + !Synd + !'static`, they can never
             // be called in parallel. Since mutable access to `world` only exists within
             // the scope of either closure, we can be sure they will never alias one another.
             |input| {
-                self.a
-                    .run_exclusive(input, unsafe { world.deref_mut() }, state_a, system_meta)
+                let world = unsafe { world.deref_mut() };
+                let system_meta = unsafe { system_meta.deref_mut() };
+                self.a.run_exclusive(input, world, state_a, system_meta)
             },
             |input| {
-                self.b
-                    .run_exclusive(input, unsafe { world.deref_mut() }, state_b, system_meta)
+                let world = unsafe { world.deref_mut() };
+                let system_meta = unsafe { system_meta.deref_mut() };
+                self.b.run_exclusive(input, world, state_b, system_meta)
             },
         )
     }

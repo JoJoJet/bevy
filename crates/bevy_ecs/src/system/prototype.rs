@@ -1,7 +1,7 @@
 use std::marker::PhantomData;
 
 use crate::{
-    archetype::{ArchetypeGeneration, ArchetypeId},
+    archetype::{Archetype, ArchetypeGeneration, ArchetypeId},
     change_detection::MAX_CHANGE_AGE,
     prelude::FromWorld,
     world::{World, WorldId},
@@ -21,6 +21,17 @@ pub trait SystemPrototype<Marker>: Sized + Send + Sync + 'static {
 
     type Param: SystemParam;
 
+    fn new_archetypes(
+        &mut self,
+        state: &mut <Self::Param as SystemParam>::State,
+        system_meta: &mut SystemMeta,
+        archetypes: &[Archetype],
+    ) {
+        for archetype in archetypes {
+            Self::Param::new_archetype(state, archetype, system_meta);
+        }
+    }
+
     fn run_parallel(
         &mut self,
         input: Self::In,
@@ -33,10 +44,8 @@ pub trait SystemPrototype<Marker>: Sized + Send + Sync + 'static {
         input: Self::In,
         world: &mut World,
         state: &mut <Self::Param as SystemParam>::State,
-        system_meta: &SystemMeta,
-    ) -> Self::Out {
-        self.run_parallel(input, world, state, system_meta)
-    }
+        system_meta: &mut SystemMeta,
+    ) -> Self::Out;
 
     fn check_change_tick(
         &mut self,
@@ -72,13 +81,17 @@ where
     type In = F::In;
     type Out = F::Out;
 
-    type Param = (Local<'static, LastChangeTick>, F::Param);
+    type Param = (
+        Local<'static, LastChangeTick>,
+        Local<'static, ArchetypeGeneration>,
+        F::Param,
+    );
 
     fn run_parallel(
         &mut self,
         input: Self::In,
         world: &World,
-        (last_change_tick, state): &mut <Self::Param as SystemParam>::State,
+        (last_change_tick, _, state): &mut <Self::Param as SystemParam>::State,
         system_meta: &SystemMeta,
     ) -> Self::Out {
         let last_change_tick = &mut last_change_tick.get().0;
@@ -92,9 +105,34 @@ where
         output
     }
 
+    fn run_exclusive(
+        &mut self,
+        input: Self::In,
+        world: &mut World,
+        state: &mut <Self::Param as SystemParam>::State,
+        system_meta: &mut SystemMeta,
+    ) -> Self::Out {
+        // Update archetypes.
+        let archetype_generation = state.1.get();
+        let archetypes = world.archetypes();
+        let new_generation = archetypes.generation();
+        let old_generation = std::mem::replace(archetype_generation, new_generation);
+        let archetype_index_range = old_generation.value()..new_generation.value();
+
+        for archetype_index in archetype_index_range {
+            Self::Param::new_archetype(
+                state,
+                &archetypes[ArchetypeId::new(archetype_index)],
+                system_meta,
+            );
+        }
+
+        self.run_parallel(input, world, state, system_meta)
+    }
+
     fn check_change_tick(
         &mut self,
-        (last_change_tick, _): &mut <Self::Param as SystemParam>::State,
+        (last_change_tick, ..): &mut <Self::Param as SystemParam>::State,
         change_tick: u32,
     ) {
         check_system_change_tick(
@@ -106,14 +144,14 @@ where
 
     fn get_last_change_tick(
         &self,
-        (last_change_tick, _): &<Self::Param as SystemParam>::State,
+        (last_change_tick, ..): &<Self::Param as SystemParam>::State,
     ) -> u32 {
         last_change_tick.read().0
     }
 
     fn set_last_change_tick(
         &mut self,
-        (last_change_tick, _): &mut <Self::Param as SystemParam>::State,
+        (last_change_tick, ..): &mut <Self::Param as SystemParam>::State,
         change_tick: u32,
     ) {
         last_change_tick.get().0 = change_tick;
@@ -146,7 +184,7 @@ where
         input: Self::In,
         world: &mut World,
         (last_change_tick, state): &mut <Self::Param as SystemParam>::State,
-        system_meta: &SystemMeta,
+        system_meta: &mut SystemMeta,
     ) -> Self::Out {
         let last_change_tick = &mut last_change_tick.get().0;
         let saved_last_tick = world.last_change_tick;
@@ -276,11 +314,12 @@ where
     }
 
     fn run(&mut self, input: Self::In, world: &mut World) -> Self::Out {
+        assert!(self.world_id == Some(world.id()), "Encountered a mismatched World. A System cannot be used with Worlds other than the one it was initialized with.");
         self.prototype.run_exclusive(
             input,
             world,
             self.param_state.as_mut().expect(PARAM_MESSAGE),
-            &self.system_meta,
+            &mut self.system_meta,
         )
     }
 
