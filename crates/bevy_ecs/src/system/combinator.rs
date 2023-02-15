@@ -4,7 +4,7 @@ use bevy_ptr::UnsafeCellDeref;
 
 use crate::prelude::World;
 
-use super::{prototype::SystemPrototype, ParamSet, SystemParam, SystemParamItem};
+use super::{prototype::SystemPrototype, ParamSet, SystemMeta, SystemParam};
 
 #[allow(unused_imports)] // Used in docs.
 use crate::system::System;
@@ -127,30 +127,17 @@ where
 
     type Param = ParamSet<'static, 'static, (A::Param, B::Param)>;
 
-    // clippy is way too strict with the formatting it expects
-    #[allow(clippy::undocumented_unsafe_blocks)]
     fn run_parallel(
         &mut self,
         input: Self::In,
-        mut param: SystemParamItem<Self::Param>,
+        world: &World,
+        (state_a, state_b): &mut <Self::Param as SystemParam>::State,
+        system_meta: &SystemMeta,
     ) -> Self::Out {
-        // SAFETY: Converting `&mut T` -> `&UnsafeCell<T>`
-        // is explicitly allowed in the docs for `UnsafeCell`.
-        let param: &UnsafeCell<SystemParamItem<Self::Param>> =
-            unsafe { std::mem::transmute(&mut param) };
         Func::combine(
             input,
-            // SAFETY: Since these closures are `!Send + !Synd + !'static`, they can never
-            // be called in parallel. Since mutable access to `param` only exists within
-            // the scope of either closure, we can be sure they will never alias one another.
-            |input| {
-                self.a
-                    .run_parallel(input, unsafe { param.deref_mut().p0() })
-            },
-            |input| {
-                self.b
-                    .run_parallel(input, unsafe { param.deref_mut().p1() })
-            },
+            |input| self.a.run_parallel(input, world, state_a, system_meta),
+            |input| self.b.run_parallel(input, world, state_b, system_meta),
         )
     }
 

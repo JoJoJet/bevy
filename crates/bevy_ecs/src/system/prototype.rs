@@ -9,7 +9,7 @@ use crate::{
 use super::{
     check_system_change_tick, ExclusiveSystemParam, ExclusiveSystemParamFunction, IntoSystem,
     IsExclusiveFunctionSystem, IsFunctionSystem, ReadOnlySystem, ReadOnlySystemParam, System,
-    SystemMeta, SystemParam, SystemParamFunction, SystemParamItem,
+    SystemMeta, SystemParam, SystemParamFunction,
 };
 
 pub trait SystemPrototype<Marker>: Sized + Send + Sync + 'static {
@@ -20,14 +20,22 @@ pub trait SystemPrototype<Marker>: Sized + Send + Sync + 'static {
 
     type Param: SystemParam;
 
-    fn run_parallel(&mut self, input: Self::In, param: SystemParamItem<Self::Param>) -> Self::Out;
+    fn run_parallel(
+        &mut self,
+        input: Self::In,
+        world: &World,
+        state: &mut <Self::Param as SystemParam>::State,
+        system_meta: &SystemMeta,
+    ) -> Self::Out;
     fn run_exclusive(
         &mut self,
         input: Self::In,
         world: &mut World,
         state: &mut <Self::Param as SystemParam>::State,
         system_meta: &SystemMeta,
-    ) -> Self::Out;
+    ) -> Self::Out {
+        self.run_parallel(input, world, state, system_meta)
+    }
 }
 
 impl<Marker, F> SystemPrototype<(IsFunctionSystem, Marker)> for F
@@ -41,18 +49,14 @@ where
 
     type Param = F::Param;
 
-    fn run_parallel(&mut self, input: Self::In, param: SystemParamItem<Self::Param>) -> Self::Out {
-        self.run(input, param)
-    }
-
-    fn run_exclusive(
+    fn run_parallel(
         &mut self,
         input: Self::In,
-        world: &mut World,
-        state: &mut <F::Param as SystemParam>::State,
+        world: &World,
+        state: &mut <Self::Param as SystemParam>::State,
         system_meta: &SystemMeta,
     ) -> Self::Out {
-        let change_tick = world.change_tick();
+        let change_tick = world.read_change_tick();
         // SAFETY: shut up clippy
         let params = unsafe { F::Param::get_param(state, system_meta, world, change_tick) };
         self.run(input, params)
@@ -73,7 +77,9 @@ where
     fn run_parallel(
         &mut self,
         _input: Self::In,
-        _param: SystemParamItem<Self::Param>,
+        _world: &World,
+        _state: &mut <Self::Param as SystemParam>::State,
+        _system_meta: &SystemMeta,
     ) -> Self::Out {
         panic!("Cannot run exclusive systems with a shared World reference");
     }
@@ -167,17 +173,12 @@ where
     unsafe fn run_unsafe(&mut self, input: Self::In, world: &World) -> Self::Out {
         let change_tick = world.increment_change_tick();
 
-        // Safety:
-        // We update the archetype component access correctly based on `Param`'s requirements
-        // in `update_archetype_component_access`.
-        // Our caller upholds the requirements.
-        let params = T::Param::get_param(
+        let out = self.prototype.run_parallel(
+            input,
+            world,
             self.param_state.as_mut().expect(PARAM_MESSAGE),
             &self.system_meta,
-            world,
-            change_tick,
         );
-        let out = self.prototype.run_parallel(input, params);
         self.system_meta.last_change_tick = change_tick;
         out
     }

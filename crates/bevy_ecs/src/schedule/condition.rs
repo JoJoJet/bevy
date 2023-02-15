@@ -121,7 +121,7 @@ pub mod common_conditions {
     use super::Condition;
     use crate::{
         schedule::{State, States},
-        system::{ReadOnlySystemParam, Res, Resource, SystemParam, SystemPrototype},
+        system::{ReadOnlySystemParam, Res, Resource, SystemMeta, SystemParam, SystemPrototype},
         world::World,
     };
 
@@ -258,9 +258,11 @@ pub mod common_conditions {
             fn run_parallel(
                 &mut self,
                 input: Self::In,
-                param: crate::system::SystemParamItem<Self::Param>,
+                world: &World,
+                state: &mut <Self::Param as SystemParam>::State,
+                system_meta: &SystemMeta,
             ) -> Self::Out {
-                !self.inner.run_parallel(input, param)
+                !self.inner.run_parallel(input, world, state, system_meta)
             }
 
             fn run_exclusive(
