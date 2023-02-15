@@ -262,8 +262,7 @@ unsafe impl<T: ExclusiveSystemParam> SystemParam for WithState<T> {
     }
 }
 
-/// Wraps any [`SystemPrototype`] type, replacing its marker type
-/// with `()`.
+/// Wraps any [`SystemPrototype`], replacing its marker type with `()`.
 pub struct WithMarker<Marker, T>
 where
     T: SystemPrototype<Marker>,
