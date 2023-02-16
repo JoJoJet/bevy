@@ -54,7 +54,7 @@ impl SystemMeta {
     }
 }
 
-// TODO: Actually use this in FunctionSystem. We should probably only do this once Systems are constructed using a World reference
+// TODO: Actually use this in PrototypeSystem. We should probably only do this once Systems are constructed using a World reference
 // (to avoid the need for unwrapping to retrieve SystemMeta)
 /// Holds on to persistent state required to drive [`SystemParam`] for a [`System`].
 ///
@@ -335,7 +335,7 @@ impl<In, Out, Sys: System<In = In, Out = Out>> IntoSystem<In, Out, AlreadyWasSys
 /// Wrapper type to mark a [`SystemParam`] as an input.
 ///
 /// [`System`]s may take an optional input which they require to be passed to them when they
-/// are being [`run`](System::run). For [`FunctionSystems`](FunctionSystem) the input may be marked
+/// are being [`run`](System::run). For function systems, the input may be marked
 /// with this `In` type, but only the first param of a function may be tagged as an input. This also
 /// means a system can only have one or zero input parameters.
 ///
