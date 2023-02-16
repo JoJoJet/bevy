@@ -25,13 +25,20 @@ use super::{
 /// [regular system functions]: crate::system::SystemParamFunction
 /// [exclusive system functions]: crate::system::ExclusiveSystemParamFunction
 pub trait SystemPrototype<Marker>: Sized + Send + Sync + 'static {
+    /// If `true`, then this prototype describes an exclusive system.
+    /// Otherwise, this prototype describes system that can run in parallel with other systems.
     const IS_EXCLUSIVE: bool;
 
+    /// The input type to this prototype. See [`System::In`].
     type In;
+
+    /// The output type for this prototype. See [`System::Out`].
     type Out;
 
+    /// The [`SystemParam`] describing the world accesses used by this prototype.
     type Param: SystemParam;
 
+    /// Updates this system's archetype component [`Access`](crate::query::Access).
     fn update_archetype_component_access(
         &mut self,
         state: &mut <Self::Param as SystemParam>::State,
