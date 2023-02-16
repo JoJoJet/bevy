@@ -443,7 +443,7 @@ where
         let change_tick = world.read_change_tick();
         // SAFETY: shut up clippy
         let params = unsafe {
-            F::Param::get_param(state, system_meta, world, change_tick, *last_change_tick)
+            F::Param::get_param(state, system_meta, world, *last_change_tick, change_tick)
         };
         let output = self.run(input, params);
         *last_change_tick = change_tick;
