@@ -96,7 +96,6 @@ where
     T: SystemPrototype<Marker>,
 {
     type In = T::In;
-
     type Out = T::Out;
 
     fn name(&self) -> std::borrow::Cow<'static, str> {
