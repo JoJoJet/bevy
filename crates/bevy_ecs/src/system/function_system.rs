@@ -375,7 +375,7 @@ where
 
     type Param = (Local<'static, ArchetypeGeneration>, F::Param);
 
-    fn run_parallel(
+    unsafe fn run_parallel(
         &mut self,
         input: Self::In,
         world: &World,
@@ -402,7 +402,9 @@ where
         system_meta: &mut SystemMeta,
     ) -> Self::Out {
         self.update_archetype_component_access(state, system_meta, world);
-        self.run_parallel(input, world, state, system_meta)
+        // SAFETY: We have exclusive access to the entire world,
+        // which guarantees no data access conflicts.
+        unsafe { self.run_parallel(input, world, state, system_meta) }
     }
 
     fn update_archetype_component_access(

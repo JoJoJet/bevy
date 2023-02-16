@@ -25,13 +25,21 @@ pub trait SystemPrototype<Marker>: Sized + Send + Sync + 'static {
         world: &World,
     );
 
-    fn run_parallel(
+    /// # Safety
+    ///
+    /// It must be safe to call [`Self::Param::get_param`] with `world`.
+    /// This means that no other systems may conflict with any of the
+    /// world data accesses used by `Self::Param`.
+    ///
+    /// [`Self::Param::get_param`]: SystemParam::get_param
+    unsafe fn run_parallel(
         &mut self,
         input: Self::In,
         world: &World,
         state: &mut <Self::Param as SystemParam>::State,
         system_meta: &mut SystemMeta,
     ) -> Self::Out;
+
     fn run_exclusive(
         &mut self,
         input: Self::In,
@@ -97,6 +105,8 @@ where
     }
 
     unsafe fn run_unsafe(&mut self, input: Self::In, world: &World) -> Self::Out {
+        // SAFETY: We register all of the world accesses used by `Self::Param`,
+        // so the caller will guarantee that there are no data access conflicts.
         self.prototype.run_parallel(
             input,
             world,

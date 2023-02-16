@@ -23,7 +23,7 @@ where
 
     type Param = AsParallel<'static, F::Param>;
 
-    fn run_parallel(
+    unsafe fn run_parallel(
         &mut self,
         _input: Self::In,
         _world: &World,
