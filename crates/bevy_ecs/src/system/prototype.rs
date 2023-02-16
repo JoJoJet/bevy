@@ -46,6 +46,8 @@ pub trait SystemPrototype<Marker>: Sized + Send + Sync + 'static {
         world: &World,
     );
 
+    /// Executes the system once, potentially in parallel with other systems.
+    ///
     /// # Safety
     ///
     /// It must be safe to call [`Self::Param::get_param`] with `world`.
@@ -61,6 +63,7 @@ pub trait SystemPrototype<Marker>: Sized + Send + Sync + 'static {
         system_meta: &mut SystemMeta,
     ) -> Self::Out;
 
+    /// Executes the system once, with exclusive access to the world.
     fn run_exclusive(
         &mut self,
         input: Self::In,
