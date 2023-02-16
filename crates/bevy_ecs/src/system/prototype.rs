@@ -86,7 +86,9 @@ where
     }
 
     fn is_send(&self) -> bool {
-        self.system_meta.is_send
+        // Exclusive systems should not be send.
+        // For parallel systems, it depends on the accesses registered.
+        !T::IS_EXCLUSIVE && self.system_meta.is_send
     }
 
     fn is_exclusive(&self) -> bool {
