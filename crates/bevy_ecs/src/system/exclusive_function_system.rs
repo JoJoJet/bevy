@@ -5,7 +5,7 @@ use crate::{
     query::Access,
     system::{
         check_system_change_tick, ExclusiveSystemParam, ExclusiveSystemParamItem, In, InputMarker,
-        IntoSystem, System, SystemMeta,
+        IntoSystem, System, SystemMeta, SystemParam,
     },
     world::{World, WorldId},
 };
@@ -151,6 +151,30 @@ where
     fn default_system_sets(&self) -> Vec<Box<dyn crate::schedule::SystemSet>> {
         let set = crate::schedule::SystemTypeSet::<F>::new();
         vec![Box::new(set)]
+    }
+}
+
+/// Allows using an [`ExclusiveSystemParam`] as a [`SystemParam`].
+pub struct AsParallel<'s, T: ExclusiveSystemParam>(T::Item<'s>);
+
+// SAFETY: No world access.
+unsafe impl<T: ExclusiveSystemParam> SystemParam for AsParallel<'_, T> {
+    type State = T::State;
+    type Item<'world, 'state> = AsParallel<'state, T>;
+
+    #[inline]
+    fn init_state(world: &mut World, system_meta: &mut SystemMeta) -> Self::State {
+        T::init(world, system_meta)
+    }
+
+    #[inline]
+    unsafe fn get_param<'world, 'state>(
+        state: &'state mut Self::State,
+        system_meta: &SystemMeta,
+        _world: &'world World,
+        _change_tick: u32,
+    ) -> Self::Item<'world, 'state> {
+        AsParallel(T::get_param(state, system_meta))
     }
 }
 
