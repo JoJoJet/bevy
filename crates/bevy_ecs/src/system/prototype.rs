@@ -11,8 +11,8 @@ use super::{
 };
 
 /// Types that define a [`System`], and can be converted into one.
-/// This is implemented for regular function systems as well as
-/// exclusive function systems.
+/// This is implemented for [regular system functions] as well as
+/// [exclusive system functions].
 ///
 /// Types that have already been converted into a `System` do not
 /// implement this trait -- this is the main difference between
@@ -21,6 +21,9 @@ use super::{
 /// to a system, excluding types that are already systems.
 /// * `IntoSystem` is implemented for any types that can be converted
 /// to a system, including systems and system prototypes.
+///
+/// [regular system functions]: crate::system::SystemParamFunction
+/// [exclusive system functions]: crate::system::ExclusiveSystemParamFunction
 pub trait SystemPrototype<Marker>: Sized + Send + Sync + 'static {
     const IS_EXCLUSIVE: bool;
 
