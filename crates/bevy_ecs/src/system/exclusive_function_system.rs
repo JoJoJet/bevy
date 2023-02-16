@@ -5,7 +5,7 @@ use crate::{
     },
     world::World,
 };
-use bevy_ecs_macros::all_tuples;
+use bevy_utils::all_tuples;
 
 #[allow(unused_imports)] // Used in docs.
 use crate::system::System;

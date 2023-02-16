@@ -7,7 +7,7 @@ use crate::{
     system::{Local, ReadOnlySystemParam, System, SystemParam, SystemParamItem, SystemPrototype},
     world::{World, WorldId},
 };
-use bevy_ecs_macros::all_tuples;
+use bevy_utils::all_tuples;
 use std::borrow::Cow;
 
 /// The metadata of a [`System`].
