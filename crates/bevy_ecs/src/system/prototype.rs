@@ -26,7 +26,7 @@ use super::{
 /// [exclusive system functions]: crate::system::ExclusiveSystemParamFunction
 pub trait SystemPrototype<Marker>: Sized + Send + Sync + 'static {
     /// If `true`, then this prototype describes an exclusive system.
-    /// Otherwise, this prototype describes system that can run in parallel with other systems.
+    /// Otherwise, this prototype describes a system that can run in parallel with other systems.
     const IS_EXCLUSIVE: bool;
 
     /// The input type to this prototype. See [`System::In`].
