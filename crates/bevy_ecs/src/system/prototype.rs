@@ -86,7 +86,8 @@ where
     }
 
     fn is_send(&self) -> bool {
-        // Exclusive systems should not be send.
+        // Exclusive systems have have access to non-send resources,
+        // so the executor must run them on the main thread.
         // For parallel systems, it depends on the accesses registered.
         !T::IS_EXCLUSIVE && self.system_meta.is_send
     }
