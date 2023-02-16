@@ -10,6 +10,17 @@ use super::{
     SystemParam,
 };
 
+/// Types that define a [`System`], and can be converted into one.
+/// This is implemented for regular function systems as well as
+/// exclusive function systems.
+///
+/// Types that have already been converted into a `System` do not
+/// implement this trait -- this is the main difference between
+/// [`IntoSystem`] and [`SystemPrototype`].
+/// * `SystemPrototype` is implemented for types that can be converted
+/// to a system, excluding types that are already systems.
+/// * `IntoSystem` is implemented for any types that can be converted
+/// to a system, including systems and system prototypes.
 pub trait SystemPrototype<Marker>: Sized + Send + Sync + 'static {
     const IS_EXCLUSIVE: bool;
 
