@@ -35,7 +35,7 @@ pub trait SystemPrototype<Marker>: Sized + Send + Sync + 'static {
     /// The output type for this prototype. See [`System::Out`].
     type Out;
 
-    /// The [`SystemParam`] describing the world accesses used by this prototype.
+    /// The [`SystemParam`] describing the [`World`] accesses used by this prototype.
     type Param: SystemParam;
 
     /// Updates this system's archetype component [`Access`](crate::query::Access).
@@ -52,7 +52,7 @@ pub trait SystemPrototype<Marker>: Sized + Send + Sync + 'static {
     ///
     /// It must be safe to call [`Self::Param::get_param`] with `world`.
     /// This means that no other systems may conflict with any of the
-    /// world data accesses used by `Self::Param`.
+    /// [`World`] data accesses used by `Self::Param`.
     ///
     /// [`Self::Param::get_param`]: SystemParam::get_param
     unsafe fn run_parallel(
@@ -63,7 +63,7 @@ pub trait SystemPrototype<Marker>: Sized + Send + Sync + 'static {
         system_meta: &mut SystemMeta,
     ) -> Self::Out;
 
-    /// Executes the system once, with exclusive access to the world.
+    /// Executes the system once, with exclusive access to the [`World`].
     fn run_exclusive(
         &mut self,
         input: Self::In,
