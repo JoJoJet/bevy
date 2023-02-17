@@ -114,6 +114,14 @@ impl Schedules {
     }
 }
 
+fn make_executor(kind: ExecutorKind) -> Box<dyn SystemExecutor> {
+    match kind {
+        ExecutorKind::Simple => Box::new(SimpleExecutor::new()),
+        ExecutorKind::SingleThreaded => Box::new(SingleThreadedExecutor::new()),
+        ExecutorKind::MultiThreaded => Box::new(MultiThreadedExecutor::new()),
+    }
+}
+
 /// A collection of systems, and the metadata and executor needed to run them
 /// in a certain order under certain conditions.
 pub struct Schedule {
@@ -135,7 +143,7 @@ impl Schedule {
         Self {
             graph: ScheduleGraph::new(),
             executable: SystemSchedule::new(),
-            executor: Box::new(MultiThreadedExecutor::new()),
+            executor: make_executor(ExecutorKind::default()),
             executor_initialized: false,
         }
     }
@@ -184,11 +192,7 @@ impl Schedule {
     /// Sets the schedule's execution strategy.
     pub fn set_executor_kind(&mut self, executor: ExecutorKind) -> &mut Self {
         if executor != self.executor.kind() {
-            self.executor = match executor {
-                ExecutorKind::Simple => Box::new(SimpleExecutor::new()),
-                ExecutorKind::SingleThreaded => Box::new(SingleThreadedExecutor::new()),
-                ExecutorKind::MultiThreaded => Box::new(MultiThreadedExecutor::new()),
-            };
+            self.executor = make_executor(executor);
             self.executor_initialized = false;
         }
         self
@@ -232,6 +236,11 @@ impl Schedule {
     /// Returns the [`ScheduleGraph`].
     pub fn graph(&self) -> &ScheduleGraph {
         &self.graph
+    }
+
+    /// Returns a mutable reference to the [`ScheduleGraph`].
+    pub fn graph_mut(&mut self) -> &mut ScheduleGraph {
+        &mut self.graph
     }
 
     /// Iterates the change ticks of all systems in the schedule and clamps any older than
@@ -330,7 +339,7 @@ impl SystemSetNode {
     }
 
     pub fn is_system_type(&self) -> bool {
-        self.inner.is_system_type()
+        self.inner.system_type().is_some()
     }
 }
 
@@ -377,6 +386,7 @@ pub struct ScheduleGraph {
     ambiguous_with: UnGraphMap<NodeId, ()>,
     ambiguous_with_flattened: UnGraphMap<NodeId, ()>,
     ambiguous_with_all: HashSet<NodeId>,
+    conflicting_systems: Vec<(NodeId, NodeId, Vec<ComponentId>)>,
     changed: bool,
     settings: ScheduleBuildSettings,
     default_base_set: Option<BoxedSystemSet>,
@@ -398,6 +408,7 @@ impl ScheduleGraph {
             ambiguous_with: UnGraphMap::new(),
             ambiguous_with_flattened: UnGraphMap::new(),
             ambiguous_with_all: HashSet::new(),
+            conflicting_systems: Vec::new(),
             changed: false,
             settings: default(),
             default_base_set: None,
@@ -498,6 +509,14 @@ impl ScheduleGraph {
     /// a system or set has to run before another system or set.
     pub fn dependency(&self) -> &Dag {
         &self.dependency
+    }
+
+    /// Returns the list of systems that conflict with each other, i.e. have ambiguities in their access.
+    ///
+    /// If the `Vec<ComponentId>` is empty, the systems conflict on [`World`] access.
+    /// Must be called after [`ScheduleGraph::build_schedule`] to be non-empty.
+    pub fn conflicting_systems(&self) -> &[(NodeId, NodeId, Vec<ComponentId>)] {
+        &self.conflicting_systems
     }
 
     fn add_systems<P>(&mut self, systems: impl IntoSystemConfigs<P>) {
@@ -1149,6 +1168,7 @@ impl ScheduleGraph {
                 return Err(ScheduleBuildError::Ambiguity);
             }
         }
+        self.conflicting_systems = conflicting_systems;
 
         // build the schedule
         let dg_system_ids = self.dependency_flattened.topsort.clone();
@@ -1313,10 +1333,14 @@ impl ScheduleGraph {
 // methods for reporting errors
 impl ScheduleGraph {
     fn get_node_name(&self, id: &NodeId) -> String {
-        match id {
+        let mut name = match id {
             NodeId::System(_) => self.systems[id.index()].get().unwrap().name().to_string(),
             NodeId::Set(_) => self.system_sets[id.index()].name(),
+        };
+        if self.settings.use_shortnames {
+            name = bevy_utils::get_short_name(&name);
         }
+        name
     }
 
     fn get_node_kind(id: &NodeId) -> &'static str {
@@ -1499,8 +1523,15 @@ pub enum LogLevel {
 /// Specifies miscellaneous settings for schedule construction.
 #[derive(Clone, Debug)]
 pub struct ScheduleBuildSettings {
-    ambiguity_detection: LogLevel,
-    hierarchy_detection: LogLevel,
+    /// Determines whether the presence of ambiguities (systems with conflicting access but indeterminate order)
+    /// is only logged or also results in an [`Ambiguity`](ScheduleBuildError::Ambiguity) error.
+    pub ambiguity_detection: LogLevel,
+    /// Determines whether the presence of redundant edges in the hierarchy of system sets is only
+    /// logged or also results in a [`HierarchyRedundancy`](ScheduleBuildError::HierarchyRedundancy)
+    /// error.
+    pub hierarchy_detection: LogLevel,
+    /// If set to true, node names will be shortened instead of the fully qualified type path.
+    pub use_shortnames: bool,
 }
 
 impl Default for ScheduleBuildSettings {
@@ -1514,21 +1545,7 @@ impl ScheduleBuildSettings {
         Self {
             ambiguity_detection: LogLevel::Ignore,
             hierarchy_detection: LogLevel::Warn,
+            use_shortnames: false,
         }
-    }
-
-    /// Determines whether the presence of ambiguities (systems with conflicting access but indeterminate order)
-    /// is only logged or also results in an [`Ambiguity`](ScheduleBuildError::Ambiguity) error.
-    pub fn with_ambiguity_detection(mut self, level: LogLevel) -> Self {
-        self.ambiguity_detection = level;
-        self
-    }
-
-    /// Determines whether the presence of redundant edges in the hierarchy of system sets is only
-    /// logged or also results in a [`HierarchyRedundancy`](ScheduleBuildError::HierarchyRedundancy)
-    /// error.
-    pub fn with_hierarchy_detection(mut self, level: LogLevel) -> Self {
-        self.hierarchy_detection = level;
-        self
     }
 }
