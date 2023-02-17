@@ -417,7 +417,7 @@ where
         system_meta: &mut SystemMeta,
         world: &World,
     ) {
-        assert!(*world_id.get() == world.id(), "Encountered a mismatched World. A System cannot be used with Worlds other than the one it was initialized with.");
+        assert!(*world_id.read() == world.id(), "Encountered a mismatched World. A System cannot be used with Worlds other than the one it was initialized with.");
 
         let archetypes = world.archetypes();
         let new_generation = archetypes.generation();
