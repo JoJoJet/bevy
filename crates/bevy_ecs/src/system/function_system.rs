@@ -373,13 +373,17 @@ where
     type In = F::In;
     type Out = F::Out;
 
-    type Param = (Local<'static, ArchetypeGeneration>, F::Param);
+    type Param = (
+        Local<'static, WorldId>,
+        Local<'static, ArchetypeGeneration>,
+        F::Param,
+    );
 
     unsafe fn run_parallel(
         &mut self,
         input: Self::In,
         world: &World,
-        (_, param_state): &mut <Self::Param as SystemParam>::State,
+        (.., param_state): &mut <Self::Param as SystemParam>::State,
         system_meta: &mut SystemMeta,
     ) -> Self::Out {
         let change_tick = world.increment_change_tick();
@@ -409,10 +413,12 @@ where
 
     fn update_archetype_component_access(
         &mut self,
-        (archetype_generation, param_state): &mut <Self::Param as SystemParam>::State,
+        (world_id, archetype_generation, param_state): &mut <Self::Param as SystemParam>::State,
         system_meta: &mut SystemMeta,
         world: &World,
     ) {
+        assert!(*world_id.get() == world.id(), "Encountered a mismatched World. A System cannot be used with Worlds other than the one it was initialized with.");
+
         let archetypes = world.archetypes();
         let new_generation = archetypes.generation();
         let old_generation = std::mem::replace(archetype_generation.get(), new_generation);

@@ -1,9 +1,6 @@
 use std::marker::PhantomData;
 
-use crate::{
-    change_detection::MAX_CHANGE_AGE,
-    world::{World, WorldId},
-};
+use crate::{change_detection::MAX_CHANGE_AGE, world::World};
 
 use super::{
     check_system_change_tick, IntoSystem, ReadOnlySystem, ReadOnlySystemParam, System, SystemMeta,
@@ -80,7 +77,6 @@ where
     prototype: T,
     param_state: Option<<T::Param as SystemParam>::State>,
     system_meta: SystemMeta,
-    world_id: Option<WorldId>,
     // NOTE: PhantomData<fn()-> T> gives this safe Send/Sync impls
     marker: PhantomData<fn() -> Marker>,
 }
@@ -139,7 +135,6 @@ where
     }
 
     fn run(&mut self, input: Self::In, world: &mut World) -> Self::Out {
-        assert!(self.world_id == Some(world.id()), "Encountered a mismatched World. A System cannot be used with Worlds other than the one it was initialized with.");
         self.prototype.run_exclusive(
             input,
             world,
@@ -154,14 +149,11 @@ where
     }
 
     fn initialize(&mut self, world: &mut World) {
-        self.world_id = Some(world.id());
         self.system_meta.last_change_tick = world.change_tick().wrapping_sub(MAX_CHANGE_AGE);
         self.param_state = Some(T::Param::init_state(world, &mut self.system_meta));
     }
 
     fn update_archetype_component_access(&mut self, world: &World) {
-        assert!(self.world_id == Some(world.id()), "Encountered a mismatched World. A System cannot be used with Worlds other than the one it was initialized with.");
-
         self.prototype.update_archetype_component_access(
             self.param_state.as_mut().unwrap(),
             &mut self.system_meta,
@@ -213,7 +205,6 @@ where
             prototype,
             param_state: None,
             system_meta: SystemMeta::new::<T>(),
-            world_id: None,
             marker: PhantomData,
         }
     }
