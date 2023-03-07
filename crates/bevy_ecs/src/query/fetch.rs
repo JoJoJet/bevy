@@ -1434,10 +1434,10 @@ macro_rules! impl_tuple_fetch {
 /// `Query<AnyOf<(&A, &B, &mut C)>>` is equivalent to `Query<(Option<&A>, Option<&B>, Option<&mut C>), Or<(With<A>, With<B>, With<C>)>>`.
 /// Each of the components in `T` is returned as an `Option`, as with `Option<A>` queries.
 /// Entities are guaranteed to have at least one of the components in `T`.
-pub struct AnyOf<'a, T: AnyOfParam>(pub T::Item<'a>);
+pub struct AnyOf<'a, T: AnyOfQuery>(pub T::Item<'a>);
 
 /// Types that can be used with [`AnyOf`].
-pub trait AnyOfParam: sealed::Sealed {
+pub trait AnyOfQuery: sealed::Sealed {
     type Item<'w>;
 }
 
@@ -1445,7 +1445,7 @@ macro_rules! impl_anytuple_fetch {
     ($(($name: ident, $state: ident)),*) => {
         impl<$($name: WorldQuery),*> sealed::Sealed for ($($name,)*) {}
 
-        impl<$($name: WorldQuery),*> AnyOfParam for ($($name,)*) {
+        impl<$($name: WorldQuery),*> AnyOfQuery for ($($name,)*) {
             type Item<'w> = ($(Option<$name::Item<'w>>,)*);
         }
 
@@ -1585,7 +1585,7 @@ macro_rules! impl_anytuple_fetch {
 all_tuples!(impl_tuple_fetch, 0, 15, F, S);
 all_tuples!(impl_anytuple_fetch, 0, 15, F, S);
 
-impl<'a, T: AnyOfParam> Debug for AnyOf<'a, T>
+impl<'a, T: AnyOfQuery> Debug for AnyOf<'a, T>
 where
     T::Item<'a>: Debug,
 {
@@ -1594,7 +1594,7 @@ where
     }
 }
 
-impl<'a, T: AnyOfParam> Clone for AnyOf<'a, T>
+impl<'a, T: AnyOfQuery> Clone for AnyOf<'a, T>
 where
     T::Item<'a>: Clone,
 {
@@ -1604,9 +1604,9 @@ where
     }
 }
 
-impl<'a, T: AnyOfParam> Copy for AnyOf<'a, T> where T::Item<'a>: Copy {}
+impl<'a, T: AnyOfQuery> Copy for AnyOf<'a, T> where T::Item<'a>: Copy {}
 
-impl<'a, T: AnyOfParam> PartialEq for AnyOf<'a, T>
+impl<'a, T: AnyOfQuery> PartialEq for AnyOf<'a, T>
 where
     T::Item<'a>: PartialEq,
 {
@@ -1616,9 +1616,9 @@ where
     }
 }
 
-impl<'a, T: AnyOfParam> Eq for AnyOf<'a, T> where T::Item<'a>: Eq {}
+impl<'a, T: AnyOfQuery> Eq for AnyOf<'a, T> where T::Item<'a>: Eq {}
 
-impl<'a, T: AnyOfParam> PartialOrd for AnyOf<'a, T>
+impl<'a, T: AnyOfQuery> PartialOrd for AnyOf<'a, T>
 where
     T::Item<'a>: PartialOrd,
 {
@@ -1628,7 +1628,7 @@ where
     }
 }
 
-impl<'a, T: AnyOfParam> Ord for AnyOf<'a, T>
+impl<'a, T: AnyOfQuery> Ord for AnyOf<'a, T>
 where
     T::Item<'a>: Ord,
 {
@@ -1638,7 +1638,7 @@ where
     }
 }
 
-impl<'a, T: AnyOfParam> Hash for AnyOf<'a, T>
+impl<'a, T: AnyOfQuery> Hash for AnyOf<'a, T>
 where
     T::Item<'a>: Hash,
 {
