@@ -10,7 +10,7 @@ use crate::{
 pub use bevy_ecs_macros::WorldQuery;
 use bevy_ptr::{ThinSlicePtr, UnsafeCellDeref};
 use bevy_utils::all_tuples;
-use std::{cell::UnsafeCell, marker::PhantomData};
+use std::{cell::UnsafeCell, fmt::Debug, hash::Hash, marker::PhantomData};
 
 mod sealed {
     pub trait Sealed {}
@@ -1584,6 +1584,69 @@ macro_rules! impl_anytuple_fetch {
 
 all_tuples!(impl_tuple_fetch, 0, 15, F, S);
 all_tuples!(impl_anytuple_fetch, 0, 15, F, S);
+
+impl<'a, T: AnyOfParam> Debug for AnyOf<'a, T>
+where
+    T::Item<'a>: Debug,
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        f.debug_tuple("AnyOf").field(&self.0).finish()
+    }
+}
+
+impl<'a, T: AnyOfParam> Clone for AnyOf<'a, T>
+where
+    T::Item<'a>: Clone,
+{
+    #[inline]
+    fn clone(&self) -> Self {
+        Self(self.0.clone())
+    }
+}
+
+impl<'a, T: AnyOfParam> Copy for AnyOf<'a, T> where T::Item<'a>: Copy {}
+
+impl<'a, T: AnyOfParam> PartialEq for AnyOf<'a, T>
+where
+    T::Item<'a>: PartialEq,
+{
+    #[inline]
+    fn eq(&self, other: &Self) -> bool {
+        self.0 == other.0
+    }
+}
+
+impl<'a, T: AnyOfParam> Eq for AnyOf<'a, T> where T::Item<'a>: Eq {}
+
+impl<'a, T: AnyOfParam> PartialOrd for AnyOf<'a, T>
+where
+    T::Item<'a>: PartialOrd,
+{
+    #[inline]
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        self.0.partial_cmp(&other.0)
+    }
+}
+
+impl<'a, T: AnyOfParam> Ord for AnyOf<'a, T>
+where
+    T::Item<'a>: Ord,
+{
+    #[inline]
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.0.cmp(&other.0)
+    }
+}
+
+impl<'a, T: AnyOfParam> Hash for AnyOf<'a, T>
+where
+    T::Item<'a>: Hash,
+{
+    #[inline]
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.0.hash(state);
+    }
+}
 
 /// [`WorldQuery`] used to nullify queries by turning `Query<Q>` into `Query<NopWorldQuery<Q>>`
 ///
