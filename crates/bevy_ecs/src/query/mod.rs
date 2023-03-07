@@ -464,12 +464,14 @@ mod tests {
         world.spawn(A(2));
         world.spawn(C(3));
 
-        let values: Vec<(Option<&A>, Option<&B>)> =
-            world.query::<AnyOf<(&A, &B)>>().iter(&world).collect();
+        let values: Vec<_> = world.query::<AnyOf<(&A, &B)>>().iter(&world).collect();
 
         assert_eq!(
             values,
-            vec![(Some(&A(1)), Some(&B(2))), (Some(&A(2)), None),]
+            vec![
+                AnyOf((Some(&A(1)), Some(&B(2)))),
+                AnyOf((Some(&A(2)), None)),
+            ]
         );
     }
 
@@ -560,7 +562,7 @@ mod tests {
             }
             #[derive(WorldQuery)]
             struct MatchEverything {
-                abcs: AnyOf<(&'static A, &'static B, &'static C)>,
+                abcs: AnyOf<'static, (&'static A, &'static B, &'static C)>,
                 opt_bsparse: MaybeBSparse,
             }
 
@@ -569,7 +571,7 @@ mod tests {
                 .iter(&world)
                 .map(
                     |MatchEverythingItem {
-                         abcs: (a, b, c),
+                         abcs: AnyOf((a, b, c)),
                          opt_bsparse: MaybeBSparseItem { blah: bsparse },
                      }| {
                         (
@@ -582,7 +584,7 @@ mod tests {
             let normal_data = world
                 .query::<(AnyOf<(&A, &B, &C)>, Option<(&B, &Sparse)>)>()
                 .iter(&world)
-                .map(|((a, b, c), bsparse)| {
+                .map(|(AnyOf((a, b, c)), bsparse)| {
                     (
                         (a.copied(), b.copied(), c.copied()),
                         bsparse.map(|(b, sparse)| (*b, *sparse)),
