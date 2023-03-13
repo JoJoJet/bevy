@@ -81,6 +81,8 @@ impl BatchingStrategy {
 pub struct QueryParIter<'w, 's, Q: WorldQuery, F: ReadOnlyWorldQuery> {
     pub(crate) world: &'w World,
     pub(crate) state: &'s QueryState<Q, F>,
+    pub(crate) last_change_tick: u32,
+    pub(crate) change_tick: u32,
     pub(crate) batching_strategy: BatchingStrategy,
 }
 
@@ -151,8 +153,8 @@ impl<'w, 's, Q: WorldQuery, F: ReadOnlyWorldQuery> QueryParIter<'w, 's, Q, F> {
             self.state.for_each_unchecked_manual(
                 self.world,
                 func,
-                self.world.last_change_tick(),
-                self.world.read_change_tick(),
+                self.last_change_tick,
+                self.change_tick,
             );
         } else {
             // Need a batch size of at least 1.
@@ -161,8 +163,8 @@ impl<'w, 's, Q: WorldQuery, F: ReadOnlyWorldQuery> QueryParIter<'w, 's, Q, F> {
                 self.world,
                 batch_size,
                 func,
-                self.world.last_change_tick(),
-                self.world.read_change_tick(),
+                self.last_change_tick,
+                self.change_tick,
             );
         }
     }
