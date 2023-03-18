@@ -6,8 +6,8 @@ use crate::{
     storage::{Column, ComponentSparseSet, Table, TableRow},
     world::World,
 };
-use bevy_ecs_macros::all_tuples;
 use bevy_ptr::{ThinSlicePtr, UnsafeCellDeref};
+use bevy_utils::all_tuples;
 use std::{cell::UnsafeCell, marker::PhantomData};
 
 use super::ReadOnlyWorldQuery;
@@ -52,13 +52,7 @@ unsafe impl<T: Component> WorldQuery for With<T> {
         this
     }
 
-    unsafe fn init_fetch(
-        _world: &World,
-        _state: &ComponentId,
-        _last_change_tick: u32,
-        _change_tick: u32,
-    ) {
-    }
+    unsafe fn init_fetch(_world: &World, _state: &ComponentId, _last_run: Tick, _this_run: Tick) {}
 
     unsafe fn clone_fetch<'w>(_fetch: &Self::Fetch<'w>) -> Self::Fetch<'w> {}
 
@@ -157,13 +151,7 @@ unsafe impl<T: Component> WorldQuery for Without<T> {
         this
     }
 
-    unsafe fn init_fetch(
-        _world: &World,
-        _state: &ComponentId,
-        _last_change_tick: u32,
-        _change_tick: u32,
-    ) {
-    }
+    unsafe fn init_fetch(_world: &World, _state: &ComponentId, _last_run: Tick, _this_run: Tick) {}
 
     unsafe fn clone_fetch<'w>(_fetch: &Self::Fetch<'w>) -> Self::Fetch<'w> {}
 
@@ -303,10 +291,10 @@ macro_rules! impl_query_filter_tuple {
 
             const IS_ARCHETYPAL: bool = true $(&& $filter::IS_ARCHETYPAL)*;
 
-            unsafe fn init_fetch<'w>(world: &'w World, state: &Self::State, last_change_tick: u32, change_tick: u32) -> Self::Fetch<'w> {
+            unsafe fn init_fetch<'w>(world: &'w World, state: &Self::State, last_run: Tick, this_run: Tick) -> Self::Fetch<'w> {
                 let ($($filter,)*) = state;
                 ($(OrFetch {
-                    fetch: $filter::init_fetch(world, $filter, last_change_tick, change_tick),
+                    fetch: $filter::init_fetch(world, $filter, last_run, this_run),
                     matches: false,
                 },)*)
             }
@@ -443,8 +431,8 @@ macro_rules! impl_tick_filter {
             table_ticks: Option< ThinSlicePtr<'w, UnsafeCell<Tick>>>,
             marker: PhantomData<T>,
             sparse_set: Option<&'w ComponentSparseSet>,
-            last_change_tick: u32,
-            change_tick: u32,
+            last_run: Tick,
+            this_run: Tick,
         }
 
         // SAFETY: `Self::ReadOnly` is the same as `Self`
@@ -458,7 +446,7 @@ macro_rules! impl_tick_filter {
                 $name(val)
             }
 
-            unsafe fn init_fetch<'w>(world: &'w World, &id: &ComponentId, last_change_tick: u32, change_tick: u32) -> Self::Fetch<'w> {
+            unsafe fn init_fetch<'w>(world: &'w World, &id: &ComponentId, last_run: Tick, this_run: Tick) -> Self::Fetch<'w> {
                 Self::Fetch::<'w> {
                     table_ticks: None,
                     sparse_set: (T::Storage::STORAGE_TYPE == StorageType::SparseSet)
@@ -469,8 +457,8 @@ macro_rules! impl_tick_filter {
                                  .debug_checked_unwrap()
                         }),
                     marker: PhantomData,
-                    last_change_tick,
-                    change_tick,
+                    last_run,
+                    this_run,
                 }
             }
 
@@ -480,8 +468,8 @@ macro_rules! impl_tick_filter {
                 $fetch_name {
                     table_ticks: fetch.table_ticks,
                     sparse_set: fetch.sparse_set,
-                    last_change_tick: fetch.last_change_tick,
-                    change_tick: fetch.change_tick,
+                    last_run: fetch.last_run,
+                    this_run: fetch.this_run,
                     marker: PhantomData,
                 }
             }
@@ -544,7 +532,7 @@ macro_rules! impl_tick_filter {
                             .debug_checked_unwrap()
                             .get(table_row.index())
                             .deref()
-                            .is_older_than(fetch.last_change_tick, fetch.change_tick)
+                            .is_newer_than(fetch.last_run, fetch.this_run)
                     }
                     StorageType::SparseSet => {
                         let sparse_set = &fetch
@@ -553,7 +541,7 @@ macro_rules! impl_tick_filter {
                         $get_sparse_set(sparse_set, entity)
                             .debug_checked_unwrap()
                             .deref()
-                            .is_older_than(fetch.last_change_tick, fetch.change_tick)
+                            .is_newer_than(fetch.last_run, fetch.this_run)
                     }
                 }
             }
@@ -598,7 +586,7 @@ impl_tick_filter!(
     /// A common use for this filter is one-time initialization.
     ///
     /// To retain all results without filtering but still check whether they were added after the
-    /// system last ran, use [`ChangeTrackers<T>`](crate::query::ChangeTrackers).
+    /// system last ran, use [`Ref<T>`](crate::change_detection::Ref).
     ///
     /// # Examples
     ///
@@ -634,7 +622,7 @@ impl_tick_filter!(
     /// Bevy does not compare components to their previous values.
     ///
     /// To retain all results without filtering but still check whether they were changed after the
-    /// system last ran, use [`ChangeTrackers<T>`](crate::query::ChangeTrackers).
+    /// system last ran, use [`Ref<T>`](crate::change_detection::Ref).
     ///
     /// # Examples
     ///
