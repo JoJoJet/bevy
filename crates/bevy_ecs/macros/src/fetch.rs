@@ -3,7 +3,9 @@ use proc_macro2::{Ident, Span};
 use quote::{quote, ToTokens};
 use syn::{
     parse::{Parse, ParseStream},
-    parse_quote, Attribute, Data, DataStruct, DeriveInput, Field, Fields,
+    parse_quote,
+    punctuated::Punctuated,
+    Attribute, Data, DataStruct, DeriveInput, Field, Fields,
 };
 
 use crate::bevy_ecs_path;
@@ -11,9 +13,11 @@ use crate::bevy_ecs_path;
 #[derive(Default)]
 struct FetchStructAttributes {
     pub is_mutable: bool,
+    pub derive_args: Punctuated<syn::NestedMeta, syn::token::Comma>,
 }
 
 static MUTABLE_ATTRIBUTE_NAME: &str = "mutable";
+static DERIVE_ATTRIBUTE_NAME: &str = "derive";
 
 mod field_attr_keywords {
     syn::custom_keyword!(ignore);
@@ -49,6 +53,16 @@ pub fn derive_world_query_impl(ast: DeriveInput) -> TokenStream {
                     } else {
                         panic!(
                             "The `{MUTABLE_ATTRIBUTE_NAME}` attribute is expected to have no value or arguments",
+                        );
+                    }
+                } else if ident == DERIVE_ATTRIBUTE_NAME {
+                    if let syn::Meta::List(meta_list) = meta {
+                        fetch_struct_attributes
+                            .derive_args
+                            .extend(meta_list.nested.iter().cloned());
+                    } else {
+                        panic!(
+                            "Expected a structured list within the `{DERIVE_ATTRIBUTE_NAME}` attribute",
                         );
                     }
                 } else {
@@ -150,6 +164,10 @@ pub fn derive_world_query_impl(ast: DeriveInput) -> TokenStream {
             read_only_field_types.push(quote!(<#field_ty as #path::query::WorldQuery>::ReadOnly));
         }
     }
+
+    let derive_args = &fetch_struct_attributes.derive_args;
+    // `#[derive()]` is valid syntax
+    let derive_macro_call = quote! { #[derive(#derive_args)] };
 
     let impl_fetch = |is_readonly: bool| {
         let struct_name = if is_readonly {
@@ -319,6 +337,7 @@ pub fn derive_world_query_impl(ast: DeriveInput) -> TokenStream {
     let (read_only_struct, read_only_impl) = if fetch_struct_attributes.is_mutable {
         let read_only_impl = impl_fetch(true);
         let read_only_struct = quote! {
+            #derive_macro_call
             #[doc = "Automatically generated [`WorldQuery`] type for a read-only variant of [`"]
             #[doc = stringify!(#struct_name)]
             #[doc = "`]."]

@@ -74,8 +74,8 @@ fn print_components_read_only(
 // suffix.
 // Note: if you want to use derive macros with read-only query variants, you need to pass them with
 // using the `derive` attribute.
-#[derive(WorldQuery)]
-#[world_query(mutable)]
+#[derive(WorldQuery, Debug)]
+#[world_query(mutable, derive(Debug))]
 struct CustomQuery<'a, T: Component + Debug, P: Component + Debug> {
     entity: Entity,
     a: Mut<'a, ComponentA>,

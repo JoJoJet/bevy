@@ -179,6 +179,33 @@ use std::{cell::UnsafeCell, marker::PhantomData};
 /// # bevy_ecs::system::assert_is_system(my_system);
 /// ```
 ///
+///
+/// ## Deriving traits for query items
+///
+/// The `WorldQuery` derive macro does not automatically implement the traits of the struct to the query item types.
+/// Something similar can be done by using the `#[world_query(derive(...))]` attribute.
+/// This will apply the listed derivable traits to the query item structs.
+///
+/// ```
+/// # use bevy_ecs::prelude::*;
+/// # use bevy_ecs::query::WorldQuery;
+/// #
+/// # #[derive(Component, Debug)]
+/// # struct ComponentA;
+/// #
+/// #[derive(WorldQuery)]
+/// #[world_query(mutable, derive(Debug))]
+/// struct CustomQuery<'a> {
+///     component_a: Mut<'a, ComponentA>,
+/// }
+///
+/// // This function statically checks that `T` implements `Debug`.
+/// fn assert_debug<T: std::fmt::Debug>() {}
+///
+/// assert_debug::<CustomQueryItem>();
+/// assert_debug::<CustomQueryReadOnlyItem>();
+/// ```
+///
 /// ## Query composition
 ///
 /// It is possible to use any `WorldQuery` as a field of another one.
