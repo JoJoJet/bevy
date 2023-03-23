@@ -382,7 +382,6 @@ pub fn derive_world_query_impl(input: TokenStream) -> TokenStream {
     };
 
     TokenStream::from(quote! {
-
         #read_only_struct
 
         /// SAFETY: we assert fields are readonly below
