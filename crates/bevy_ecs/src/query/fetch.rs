@@ -1548,12 +1548,10 @@ mod tests {
 
             #[derive(WorldQuery)]
             #[world_query(mutable)]
-            pub struct Q {
-                pub a: &'static mut A,
+            pub struct Q<'w> {
+                pub a: Mut<'w, A>,
             }
         }
-
-        let _ = private::QReadOnly { a: &A };
 
         fn my_system(query: Query<private::Q>) {
             for q in &query {
@@ -1572,9 +1570,9 @@ mod tests {
         // The metadata types generated would be named `ClientState` and `ClientFetch`,
         // but they should rename themselves to avoid conflicts.
         #[derive(WorldQuery)]
-        pub struct Client<S: ClientState> {
-            pub state: &'static S,
-            pub fetch: &'static ClientFetch,
+        pub struct Client<'w, S: ClientState> {
+            pub state: &'w S,
+            pub fetch: &'w ClientFetch,
         }
 
         pub trait ClientState: Component {}
