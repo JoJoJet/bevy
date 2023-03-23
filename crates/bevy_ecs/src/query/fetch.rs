@@ -124,11 +124,12 @@ use std::{cell::UnsafeCell, marker::PhantomData};
 /// }
 /// ```
 ///
-/// ## Adding methods to query items
+/// ## Adding functionality to `ReadOnly` queries
 ///
-/// It is possible to add methods to query items in order to write reusable logic about related components.
+/// For queries annoted with `#[world_query(mutable)]`, it is possible to add methods
+/// to the read-only struct in order to write reusable logic about related components.
 /// This will often make systems more readable because low level logic is moved out from them.
-/// It is done by adding `impl` blocks with methods for the `-ReadOnly` generated structs.
+/// It is done by adding `impl` blocks with methods for the `-ReadOnly` generated struct.
 ///
 /// ```
 /// # use bevy_ecs::prelude::*;
@@ -179,12 +180,10 @@ use std::{cell::UnsafeCell, marker::PhantomData};
 /// # bevy_ecs::system::assert_is_system(my_system);
 /// ```
 ///
+/// In order to derive traits for the read-only variant of a struct,
+/// you can add the attribute `#[world_query(derive(...))]` to the original struct.
+/// This will `#[derive(...)]` any listed traits for the read-only struct.
 ///
-/// ## Deriving traits for query items
-///
-/// The `WorldQuery` derive macro does not automatically implement the traits of the struct to the query item types.
-/// Something similar can be done by using the `#[world_query(derive(...))]` attribute.
-/// This will apply the listed derivable traits to the query item structs.
 ///
 /// ```
 /// # use bevy_ecs::prelude::*;
@@ -202,8 +201,7 @@ use std::{cell::UnsafeCell, marker::PhantomData};
 /// // This function statically checks that `T` implements `Debug`.
 /// fn assert_debug<T: std::fmt::Debug>() {}
 ///
-/// assert_debug::<CustomQueryItem>();
-/// assert_debug::<CustomQueryReadOnlyItem>();
+/// assert_debug::<CustomQueryReadOnly>();
 /// ```
 ///
 /// ## Query composition
