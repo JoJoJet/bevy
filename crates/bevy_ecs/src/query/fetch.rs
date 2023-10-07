@@ -1803,8 +1803,13 @@ mod tests {
     fn world_query_filter() {
         #[derive(WorldQueryFilter)]
         pub struct QueryWithFilter {
-            _filter: With<A>,
+            _with: With<A>,
+            _without: Without<B>,
         }
+
+        fn filtered_system(_: Query<(), QueryWithFilter>) {}
+
+        crate::system::assert_is_system(filtered_system);
     }
 
     // Ensures that each field of a `WorldQuery` struct's read-only variant
