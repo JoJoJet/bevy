@@ -4,7 +4,7 @@ use crate::{
     query::{
         BatchingStrategy, QueryCombinationIter, QueryComponentError, QueryEntityError, QueryIter,
         QueryManyIter, QueryParIter, QuerySingleError, QueryState, ROQueryItem, ReadOnlyWorldQuery,
-        WorldQuery,
+        WorldQuery, WorldQueryFilter,
     },
     world::{unsafe_world_cell::UnsafeWorldCell, Mut},
 };
@@ -323,7 +323,7 @@ use std::{any::TypeId, borrow::Borrow};
 /// [`Table`]: crate::storage::Table
 /// [`With`]: crate::query::With
 /// [`Without`]: crate::query::Without
-pub struct Query<'world, 'state, Q: WorldQuery, F: ReadOnlyWorldQuery = ()> {
+pub struct Query<'world, 'state, Q: WorldQuery, F: WorldQueryFilter = ()> {
     // SAFETY: Must have access to the components registered in `state`.
     world: UnsafeWorldCell<'world>,
     state: &'state QueryState<Q, F>,
@@ -337,7 +337,7 @@ pub struct Query<'world, 'state, Q: WorldQuery, F: ReadOnlyWorldQuery = ()> {
     force_read_only_component_access: bool,
 }
 
-impl<Q: WorldQuery, F: ReadOnlyWorldQuery> std::fmt::Debug for Query<'_, '_, Q, F> {
+impl<Q: WorldQuery, F: WorldQueryFilter> std::fmt::Debug for Query<'_, '_, Q, F> {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         f.debug_struct("Query")
             .field("matched_entities", &self.iter().count())
@@ -349,7 +349,7 @@ impl<Q: WorldQuery, F: ReadOnlyWorldQuery> std::fmt::Debug for Query<'_, '_, Q, 
     }
 }
 
-impl<'w, 's, Q: WorldQuery, F: ReadOnlyWorldQuery> Query<'w, 's, Q, F> {
+impl<'w, 's, Q: WorldQuery, F: WorldQueryFilter> Query<'w, 's, Q, F> {
     /// Creates a new query.
     ///
     /// # Panics
@@ -1420,7 +1420,7 @@ impl<'w, 's, Q: WorldQuery, F: ReadOnlyWorldQuery> Query<'w, 's, Q, F> {
     }
 }
 
-impl<'w, 's, Q: WorldQuery, F: ReadOnlyWorldQuery> IntoIterator for &'w Query<'_, 's, Q, F> {
+impl<'w, 's, Q: WorldQuery, F: WorldQueryFilter> IntoIterator for &'w Query<'_, 's, Q, F> {
     type Item = ROQueryItem<'w, Q>;
     type IntoIter = QueryIter<'w, 's, Q::ReadOnly, F::ReadOnly>;
 
@@ -1429,7 +1429,7 @@ impl<'w, 's, Q: WorldQuery, F: ReadOnlyWorldQuery> IntoIterator for &'w Query<'_
     }
 }
 
-impl<'w, 's, Q: WorldQuery, F: ReadOnlyWorldQuery> IntoIterator for &'w mut Query<'_, 's, Q, F> {
+impl<'w, 's, Q: WorldQuery, F: WorldQueryFilter> IntoIterator for &'w mut Query<'_, 's, Q, F> {
     type Item = Q::Item<'w>;
     type IntoIter = QueryIter<'w, 's, Q, F>;
 
@@ -1438,7 +1438,7 @@ impl<'w, 's, Q: WorldQuery, F: ReadOnlyWorldQuery> IntoIterator for &'w mut Quer
     }
 }
 
-impl<'w, 's, Q: ReadOnlyWorldQuery, F: ReadOnlyWorldQuery> Query<'w, 's, Q, F> {
+impl<'w, 's, Q: ReadOnlyWorldQuery, F: WorldQueryFilter> Query<'w, 's, Q, F> {
     /// Returns the query item for the given [`Entity`], with the actual "inner" world lifetime.
     ///
     /// In case of a nonexisting entity or mismatched component, a [`QueryEntityError`] is

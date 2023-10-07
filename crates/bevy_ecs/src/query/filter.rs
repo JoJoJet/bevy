@@ -2,15 +2,16 @@ use crate::{
     archetype::{Archetype, ArchetypeComponentId},
     component::{Component, ComponentId, ComponentStorage, StorageType, Tick},
     entity::Entity,
-    query::{Access, DebugCheckedUnwrap, FilteredAccess, WorldQuery},
+    query::{
+        Access, DebugCheckedUnwrap, FilteredAccess, ReadOnlyWorldQuery, WorldQuery,
+        WorldQueryFilter,
+    },
     storage::{Column, ComponentSparseSet, Table, TableRow},
     world::{unsafe_world_cell::UnsafeWorldCell, World},
 };
 use bevy_ptr::{ThinSlicePtr, UnsafeCellDeref};
 use bevy_utils::all_tuples;
 use std::{cell::UnsafeCell, marker::PhantomData};
-
-use super::ReadOnlyWorldQuery;
 
 /// Filter that selects entities with a component `T`.
 ///
@@ -115,6 +116,17 @@ unsafe impl<T: Component> WorldQuery for With<T> {
 
 // SAFETY: no component access or archetype component access
 unsafe impl<T: Component> ReadOnlyWorldQuery for With<T> {}
+
+impl<T: Component> WorldQueryFilter for With<T> {
+    #[inline(always)]
+    unsafe fn filter_fetch(
+        _fetch: &mut Self::Fetch<'_>,
+        _entity: Entity,
+        _table_row: TableRow,
+    ) -> bool {
+        true
+    }
+}
 
 /// Filter that selects entities without a component `T`.
 ///
@@ -270,7 +282,7 @@ macro_rules! impl_query_filter_tuple {
         #[allow(non_snake_case)]
         #[allow(clippy::unused_unit)]
         // SAFETY: defers to soundness of `$filter: WorldQuery` impl
-        unsafe impl<$($filter: WorldQuery),*> WorldQuery for Or<($($filter,)*)> {
+        unsafe impl<$($filter: WorldQueryFilter),*> WorldQuery for Or<($($filter,)*)> {
             type Fetch<'w> = ($(OrFetch<'w, $filter>,)*);
             type Item<'w> = bool;
             type ReadOnly = Or<($($filter::ReadOnly,)*)>;
@@ -332,15 +344,6 @@ macro_rules! impl_query_filter_tuple {
                 false $(|| ($filter.matches && $filter::filter_fetch(&mut $filter.fetch, _entity, _table_row)))*
             }
 
-            #[inline(always)]
-            unsafe fn filter_fetch(
-                fetch: &mut Self::Fetch<'_>,
-                entity: Entity,
-                table_row: TableRow
-            ) -> bool {
-                Self::fetch(fetch, entity, table_row)
-            }
-
             fn update_component_access(state: &Self::State, access: &mut FilteredAccess<ComponentId>) {
                 let ($($filter,)*) = state;
 
@@ -377,7 +380,18 @@ macro_rules! impl_query_filter_tuple {
         }
 
         // SAFETY: filters are read only
-        unsafe impl<$($filter: ReadOnlyWorldQuery),*> ReadOnlyWorldQuery for Or<($($filter,)*)> {}
+        unsafe impl<$($filter: WorldQueryFilter),*> ReadOnlyWorldQuery for Or<($($filter,)*)> {}
+
+        impl<$($filter: WorldQueryFilter),*> WorldQueryFilter for Or<($($filter,)*)> {
+            #[inline(always)]
+            unsafe fn filter_fetch(
+                fetch: &mut Self::Fetch<'_>,
+                entity: Entity,
+                table_row: TableRow
+            ) -> bool {
+                Self::fetch(fetch, entity, table_row)
+            }
+        }
     };
 }
 
@@ -500,15 +514,6 @@ macro_rules! impl_tick_filter {
                 }
             }
 
-            #[inline(always)]
-            unsafe fn filter_fetch(
-                fetch: &mut Self::Fetch<'_>,
-                entity: Entity,
-                table_row: TableRow
-            ) -> bool {
-                Self::fetch(fetch, entity, table_row)
-            }
-
             #[inline]
             fn update_component_access(&id: &ComponentId, access: &mut FilteredAccess<ComponentId>) {
                 if access.access().has_write(id) {
@@ -540,6 +545,17 @@ macro_rules! impl_tick_filter {
 
         /// SAFETY: read-only access
         unsafe impl<T: Component> ReadOnlyWorldQuery for $name<T> {}
+
+        impl<T: Component> WorldQueryFilter for $name<T> {
+            #[inline(always)]
+            unsafe fn filter_fetch(
+                fetch: &mut Self::Fetch<'_>,
+                entity: Entity,
+                table_row: TableRow
+            ) -> bool {
+                Self::fetch(fetch, entity, table_row)
+            }
+        }
     };
 }
 
