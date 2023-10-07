@@ -65,6 +65,7 @@ type TypeIdMap<V> = rustc_hash::FxHashMap<TypeId, V>;
 mod tests {
     use crate as bevy_ecs;
     use crate::prelude::Or;
+    use crate::query::WorldQueryFilter;
     use crate::{
         bundle::Bundle,
         change_detection::Ref,
@@ -909,7 +910,7 @@ mod tests {
             }
         }
 
-        fn get_filtered<F: ReadOnlyWorldQuery>(world: &mut World) -> Vec<Entity> {
+        fn get_filtered<F: WorldQueryFilter>(world: &mut World) -> Vec<Entity> {
             world
                 .query_filtered::<Entity, F>()
                 .iter(world)
@@ -992,7 +993,7 @@ mod tests {
             }
         }
 
-        fn get_filtered<F: ReadOnlyWorldQuery>(world: &mut World) -> Vec<Entity> {
+        fn get_filtered<F: WorldQueryFilter>(world: &mut World) -> Vec<Entity> {
             world
                 .query_filtered::<Entity, F>()
                 .iter(world)

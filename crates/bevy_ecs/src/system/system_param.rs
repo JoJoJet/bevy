@@ -1558,7 +1558,7 @@ mod tests {
     use super::*;
     use crate::{
         self as bevy_ecs, // Necessary for the `SystemParam` Derive when used inside `bevy_ecs`.
-        query::{ReadOnlyWorldQuery, WorldQuery},
+        query::{WorldQuery, WorldQueryFilter},
         system::{assert_is_system, Query},
     };
     use std::{cell::RefCell, marker::PhantomData};
@@ -1571,7 +1571,7 @@ mod tests {
             'w,
             's,
             Q: WorldQuery + Send + Sync + 'static,
-            F: ReadOnlyWorldQuery + Send + Sync + 'static = (),
+            F: WorldQueryFilter + Send + Sync + 'static = (),
         > {
             _query: Query<'w, 's, Q, F>,
         }

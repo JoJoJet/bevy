@@ -7,7 +7,7 @@ use crate::{
     storage::{ComponentSparseSet, Table, TableRow},
     world::{unsafe_world_cell::UnsafeWorldCell, EntityMut, EntityRef, Mut, Ref, World},
 };
-pub use bevy_ecs_macros::WorldQuery;
+pub use bevy_ecs_macros::{WorldQuery, WorldQueryFilter};
 use bevy_ptr::{ThinSlicePtr, UnsafeCellDeref};
 use bevy_utils::all_tuples;
 use std::{cell::UnsafeCell, marker::PhantomData};
@@ -1756,6 +1756,7 @@ mod tests {
     use super::*;
     use crate::{
         self as bevy_ecs,
+        query::filter::{With, Without},
         system::{assert_is_system, Query},
     };
 

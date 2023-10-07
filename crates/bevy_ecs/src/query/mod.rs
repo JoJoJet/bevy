@@ -64,7 +64,7 @@ impl<T> DebugCheckedUnwrap for Option<T> {
 
 #[cfg(test)]
 mod tests {
-    use super::{ReadOnlyWorldQuery, WorldQuery};
+    use super::{ReadOnlyWorldQuery, WorldQuery, WorldQueryFilter};
     use crate::prelude::{AnyOf, Changed, Entity, Or, QueryState, With, Without};
     use crate::query::{ArchetypeFilter, Has, QueryCombinationIter};
     use crate::schedule::{IntoSystemConfigs, Schedule};
@@ -616,11 +616,11 @@ mod tests {
         }
 
         {
-            #[derive(WorldQuery)]
+            #[derive(WorldQueryFilter)]
             struct AOrBFilter {
                 a: Or<(With<A>, With<B>)>,
             }
-            #[derive(WorldQuery)]
+            #[derive(WorldQueryFilter)]
             struct NoSparseThatsSlow {
                 no: Without<Sparse>,
             }
@@ -637,7 +637,7 @@ mod tests {
         }
 
         {
-            #[derive(WorldQuery)]
+            #[derive(WorldQueryFilter)]
             struct CSparseFilter {
                 tuple_structs_pls: With<C>,
                 ugh: With<Sparse>,
@@ -655,7 +655,7 @@ mod tests {
         }
 
         {
-            #[derive(WorldQuery)]
+            #[derive(WorldQueryFilter)]
             struct WithoutComps {
                 _1: Without<A>,
                 _2: Without<B>,
