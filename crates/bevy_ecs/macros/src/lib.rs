@@ -430,7 +430,13 @@ pub fn derive_system_param(input: TokenStream) -> TokenStream {
 /// Implement `WorldQuery` to use a struct as a parameter in a query
 #[proc_macro_derive(WorldQuery, attributes(world_query))]
 pub fn derive_world_query(input: TokenStream) -> TokenStream {
-    derive_world_query_impl(input)
+    derive_world_query_impl(input, false)
+}
+
+/// Implement `WorldQueryFilter` to use a struct as a parameter in a query
+#[proc_macro_derive(WorldQueryFilter)]
+pub fn derive_world_query_filer(input: TokenStream) -> TokenStream {
+    derive_world_query_impl(input, true)
 }
 
 /// Derive macro generating an impl of the trait `ScheduleLabel`.

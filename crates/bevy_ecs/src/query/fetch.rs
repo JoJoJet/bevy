@@ -1799,6 +1799,14 @@ mod tests {
         crate::system::assert_is_system(ignored_system);
     }
 
+    #[test]
+    fn world_query_filter() {
+        #[derive(WorldQueryFilter)]
+        pub struct QueryWithFilter {
+            _filter: With<A>,
+        }
+    }
+
     // Ensures that each field of a `WorldQuery` struct's read-only variant
     // has the same visibility as its corresponding mutable field.
     #[test]

@@ -27,7 +27,7 @@ mod field_attr_keywords {
 
 pub static WORLD_QUERY_ATTRIBUTE_NAME: &str = "world_query";
 
-pub fn derive_world_query_impl(input: TokenStream) -> TokenStream {
+pub fn derive_world_query_impl(input: TokenStream, impl_filter: bool) -> TokenStream {
     let tokens = input.clone();
 
     let ast = parse_macro_input!(input as DeriveInput);
@@ -81,6 +81,12 @@ pub fn derive_world_query_impl(input: TokenStream) -> TokenStream {
             Ok(())
         })
         .unwrap_or_else(|_| panic!("Invalid `{WORLD_QUERY_ATTRIBUTE_NAME}` attribute format"));
+    }
+
+    // Make sure filters are not mutable.
+    // This should never happen, since the mutable attribute cannot be added to `#[derive(WorldQueryFilter)]`.
+    if impl_filter {
+        assert!(!fetch_struct_attributes.is_mutable);
     }
 
     let path = bevy_ecs_path();
@@ -322,16 +328,6 @@ pub fn derive_world_query_impl(input: TokenStream) -> TokenStream {
                     }
                 }
 
-                #[allow(unused_variables)]
-                #[inline(always)]
-                unsafe fn filter_fetch<'__w>(
-                    _fetch: &mut <Self as #path::query::WorldQuery>::Fetch<'__w>,
-                    _entity: #path::entity::Entity,
-                    _table_row: #path::storage::TableRow,
-                ) -> bool {
-                    true #(&& <#field_types>::filter_fetch(&mut _fetch.#named_field_idents, _entity, _table_row))*
-                }
-
                 fn update_component_access(state: &Self::State, _access: &mut #path::query::FilteredAccess<#path::component::ComponentId>) {
                     #( <#field_types>::update_component_access(&state.#named_field_idents, _access); )*
                 }
@@ -404,6 +400,26 @@ pub fn derive_world_query_impl(input: TokenStream) -> TokenStream {
         }
     };
 
+    let filter_impl = if impl_filter {
+        quote! {
+            impl #user_impl_generics #path::query::WorldQueryFilter
+                for #struct_name #user_ty_generics #user_where_clauses {
+                
+                #[allow(unused_variables)]
+                #[inline(always)]
+                unsafe fn filter_fetch<'__w>(
+                    _fetch: &mut <Self as #path::query::WorldQuery>::Fetch<'__w>,
+                    _entity: #path::entity::Entity,
+                    _table_row: #path::storage::TableRow,
+                ) -> bool {
+                    true #(&& <#field_types>::filter_fetch(&mut _fetch.#named_field_idents, _entity, _table_row))*
+                }
+            }
+        }
+    } else {
+        quote! {}
+    };
+
     TokenStream::from(quote! {
         #mutable_struct
 
@@ -426,6 +442,8 @@ pub fn derive_world_query_impl(input: TokenStream) -> TokenStream {
             #mutable_impl
 
             #read_only_impl
+
+            #filter_impl
         };
 
         #[allow(dead_code)]
