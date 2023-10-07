@@ -67,8 +67,6 @@ unsafe impl<T: Component> WorldQuery for With<T> {
         }
     };
 
-    const IS_ARCHETYPAL: bool = true;
-
     #[inline]
     unsafe fn set_table(_fetch: &mut (), _state: &ComponentId, _table: &Table) {}
 
@@ -118,6 +116,8 @@ unsafe impl<T: Component> WorldQuery for With<T> {
 unsafe impl<T: Component> ReadOnlyWorldQuery for With<T> {}
 
 impl<T: Component> WorldQueryFilter for With<T> {
+    const IS_ARCHETYPAL: bool = true;
+
     #[inline(always)]
     unsafe fn filter_fetch(
         _fetch: &mut Self::Fetch<'_>,
@@ -179,8 +179,6 @@ unsafe impl<T: Component> WorldQuery for Without<T> {
         }
     };
 
-    const IS_ARCHETYPAL: bool = true;
-
     #[inline]
     unsafe fn set_table(_fetch: &mut (), _state: &Self::State, _table: &Table) {}
 
@@ -230,6 +228,8 @@ unsafe impl<T: Component> WorldQuery for Without<T> {
 unsafe impl<T: Component> ReadOnlyWorldQuery for Without<T> {}
 
 impl<T: Component> WorldQueryFilter for Without<T> {
+    const IS_ARCHETYPAL: bool = true;
+
     #[inline(always)]
     unsafe fn filter_fetch(
         _fetch: &mut Self::Fetch<'_>,
@@ -304,8 +304,6 @@ macro_rules! impl_query_filter_tuple {
             }
 
             const IS_DENSE: bool = true $(&& $filter::IS_DENSE)*;
-
-            const IS_ARCHETYPAL: bool = true $(&& $filter::IS_ARCHETYPAL)*;
 
             #[inline]
             unsafe fn init_fetch<'w>(world: UnsafeWorldCell<'w>, state: &Self::State, last_run: Tick, this_run: Tick) -> Self::Fetch<'w> {
@@ -394,6 +392,8 @@ macro_rules! impl_query_filter_tuple {
         unsafe impl<$($filter: WorldQueryFilter),*> ReadOnlyWorldQuery for Or<($($filter,)*)> {}
 
         impl<$($filter: WorldQueryFilter),*> WorldQueryFilter for Or<($($filter,)*)> {
+            const IS_ARCHETYPAL: bool = true $(&& $filter::IS_ARCHETYPAL)*;
+
             #[inline(always)]
             unsafe fn filter_fetch(
                 fetch: &mut Self::Fetch<'_>,
@@ -468,8 +468,6 @@ macro_rules! impl_tick_filter {
                     StorageType::SparseSet => false,
                 }
             };
-
-            const IS_ARCHETYPAL:  bool = false;
 
             #[inline]
             unsafe fn set_table<'w>(
@@ -558,6 +556,8 @@ macro_rules! impl_tick_filter {
         unsafe impl<T: Component> ReadOnlyWorldQuery for $name<T> {}
 
         impl<T: Component> WorldQueryFilter for $name<T> {
+            const IS_ARCHETYPAL:  bool = false;
+
             #[inline(always)]
             unsafe fn filter_fetch(
                 fetch: &mut Self::Fetch<'_>,

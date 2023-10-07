@@ -293,8 +293,6 @@ pub fn derive_world_query_impl(input: TokenStream, impl_filter: bool) -> TokenSt
 
                 const IS_DENSE: bool = true #(&& <#field_types>::IS_DENSE)*;
 
-                const IS_ARCHETYPAL: bool = true #(&& <#field_types>::IS_ARCHETYPAL)*;
-
                 /// SAFETY: we call `set_archetype` for each member that implements `Fetch`
                 #[inline]
                 unsafe fn set_archetype<'__w>(
@@ -404,6 +402,8 @@ pub fn derive_world_query_impl(input: TokenStream, impl_filter: bool) -> TokenSt
         quote! {
             impl #user_impl_generics #path::query::WorldQueryFilter
                 for #struct_name #user_ty_generics #user_where_clauses {
+
+                const IS_ARCHETYPAL: bool = true #(&& <#field_types>::IS_ARCHETYPAL)*;
 
                 #[allow(unused_variables)]
                 #[inline(always)]

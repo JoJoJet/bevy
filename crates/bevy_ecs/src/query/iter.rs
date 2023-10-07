@@ -57,8 +57,7 @@ impl<'w, 's, Q: WorldQuery, F: WorldQueryFilter> Iterator for QueryIter<'w, 's, 
 
     fn size_hint(&self) -> (usize, Option<usize>) {
         let max_size = self.cursor.max_remaining(self.tables, self.archetypes);
-        let archetype_query = Q::IS_ARCHETYPAL && F::IS_ARCHETYPAL;
-        let min_size = if archetype_query { max_size } else { 0 };
+        let min_size = if F::IS_ARCHETYPAL { max_size } else { 0 };
         (min_size, Some(max_size))
     }
 }
@@ -422,9 +421,8 @@ impl<'w, 's, Q: ReadOnlyWorldQuery, F: WorldQueryFilter, const K: usize> Iterato
                 Some(acc + choose(n, K - i)?)
             });
 
-        let archetype_query = F::IS_ARCHETYPAL && Q::IS_ARCHETYPAL;
         let known_max = max_combinations.unwrap_or(usize::MAX);
-        let min_combinations = if archetype_query { known_max } else { 0 };
+        let min_combinations = if F::IS_ARCHETYPAL { known_max } else { 0 };
         (min_combinations, max_combinations)
     }
 }
