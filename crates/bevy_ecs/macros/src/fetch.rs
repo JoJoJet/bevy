@@ -404,7 +404,7 @@ pub fn derive_world_query_impl(input: TokenStream, impl_filter: bool) -> TokenSt
         quote! {
             impl #user_impl_generics #path::query::WorldQueryFilter
                 for #struct_name #user_ty_generics #user_where_clauses {
-                
+
                 #[allow(unused_variables)]
                 #[inline(always)]
                 unsafe fn filter_fetch<'__w>(

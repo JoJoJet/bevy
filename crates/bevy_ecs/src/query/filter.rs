@@ -229,6 +229,17 @@ unsafe impl<T: Component> WorldQuery for Without<T> {
 // SAFETY: no component access or archetype component access
 unsafe impl<T: Component> ReadOnlyWorldQuery for Without<T> {}
 
+impl<T: Component> WorldQueryFilter for Without<T> {
+    #[inline(always)]
+    unsafe fn filter_fetch(
+        _fetch: &mut Self::Fetch<'_>,
+        _entity: Entity,
+        _table_row: TableRow,
+    ) -> bool {
+        true
+    }
+}
+
 /// A filter that tests if any of the given filters apply.
 ///
 /// This is useful for example if a system with multiple components in a query only wants to run
