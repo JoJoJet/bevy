@@ -653,10 +653,10 @@ impl_tick_filter!(
 ///
 /// [`Added`] and [`Changed`] works with entities, and therefore are not archetypal. As such
 /// they do not implement [`ArchetypeFilter`].
-pub trait ArchetypeFilter {}
+pub trait ArchetypeFilter: WorldQueryFilter {}
 
-impl<T> ArchetypeFilter for With<T> {}
-impl<T> ArchetypeFilter for Without<T> {}
+impl<T: Component> ArchetypeFilter for With<T> {}
+impl<T: Component> ArchetypeFilter for Without<T> {}
 
 macro_rules! impl_archetype_filter_tuple {
     ($($filter: ident),*) => {

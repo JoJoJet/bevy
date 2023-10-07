@@ -9,7 +9,7 @@ use bevy_asset::{Asset, Handle};
 use bevy_ecs::{
     component::Component,
     prelude::*,
-    query::{QueryItem, ReadOnlyWorldQuery, WorldQuery},
+    query::{QueryItem, ReadOnlyWorldQuery, WorldQueryFilter},
     system::lifetimeless::Read,
 };
 use std::{marker::PhantomData, ops::Deref};
@@ -36,9 +36,9 @@ impl<C: Component> DynamicUniformIndex<C> {
 /// in the [`ExtractSchedule`] step.
 pub trait ExtractComponent: Component {
     /// ECS [`WorldQuery`] to fetch the components to extract.
-    type Query: WorldQuery + ReadOnlyWorldQuery;
+    type Query: ReadOnlyWorldQuery;
     /// Filters the entities with additional constraints.
-    type Filter: WorldQuery + ReadOnlyWorldQuery;
+    type Filter: WorldQueryFilter;
 
     /// The output from extraction.
     ///
