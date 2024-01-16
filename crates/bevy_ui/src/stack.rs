@@ -57,12 +57,11 @@ pub fn ui_stack_system(
     ui_stack.uinodes.reserve(total_entry_count);
     fill_stack_recursively(&mut ui_stack.uinodes, &mut global_context);
 
-    for (i, entity) in ui_stack.uinodes.iter().enumerate() {
-        update_query
-            .get_mut(*entity)
-            .unwrap()
-            .bypass_change_detection()
-            .stack_index = i as u32;
+    for (i, &entity) in ui_stack.uinodes.iter().enumerate() {
+        let Ok(mut node) = update_query.get_mut(entity) else {
+            continue;
+        };
+        node.bypass_change_detection().stack_index = i as u32;
     }
 }
 
